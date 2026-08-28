@@ -174,6 +174,8 @@
       /* timeline */
       .entry { display: grid; grid-template-columns: 150px 1fr; gap: 26px; padding: 20px 0; border-top: 1px solid var(--line); }
       .entry:first-of-type { border-top: 0; }
+      .cv-group + .cv-group { margin-top: 34px; }
+      .cv-head { font-family: var(--serif); font-size: 16px; font-weight: 600; color: var(--ink); margin: 0 0 2px; }
       .entry .when { font-size: 13.5px; color: var(--muted); font-variant-numeric: tabular-nums; padding-top: 3px; }
       .entry h3 { font-family: var(--serif); font-weight: 600; font-size: 18px; margin: 0 0 3px; }
       .entry .org { font-size: 14.5px; color: var(--accent-ink); font-weight: 500; margin: 0 0 7px; }
@@ -362,38 +364,36 @@
 
       <!-- CV -->
       <section id="cv">
-        <p class="label reveal">Education &amp; Experience</p>
+        <p class="label reveal">CV</p>
         <div class="reveal">
-          <div class="entry">
-            <div class="when">2024 — Present</div>
-            <div>
-              <h3>Research Intern</h3>
-              <p class="org">Microsoft Research Asia</p>
-              <p>Video generation, world models and image editing.</p>
+          <div class="cv-group">
+            <p class="cv-head">Education</p>
+            <div class="entry">
+              <div class="when">2023 — 2028</div>
+              <div>
+                <h3>Ph.D. Student &nbsp;·&nbsp; USTC&ndash;MSRA Joint Ph.D. Program</h3>
+                <p class="org">Electronic Engineering and Information Science, University of Science and Technology of China</p>
+                <p>Research on video generation and world models, carried out at Microsoft Research Asia.</p>
+              </div>
+            </div>
+            <div class="entry">
+              <div class="when">2019 — 2023</div>
+              <div>
+                <h3>B.Sc. in Data Science and Big Data Technology</h3>
+                <p class="org">School of Artificial Intelligence and Data Science, University of Science and Technology of China</p>
+                <p class="meta">GPA 3.9 / 4.3 · Rank 1 / 40 in the major</p>
+              </div>
             </div>
           </div>
-          <div class="entry">
-            <div class="when">2023 — 2028</div>
-            <div>
-              <h3>Ph.D. Student &nbsp;·&nbsp; USTC&ndash;MSRA Joint Ph.D. Program</h3>
-              <p class="org">Electronic Engineering and Information Science, University of Science and Technology of China</p>
-              <p>Research on video generation and world models, carried out at Microsoft Research Asia.</p>
-            </div>
-          </div>
-          <div class="entry">
-            <div class="when">2022 — 2023</div>
-            <div>
-              <h3>Research Intern</h3>
-              <p class="org">Microsoft Research Asia</p>
-              <p>Controllable visual-text generation (GlyphControl) and diffusion-based training-data synthesis for handwritten character recognition.</p>
-            </div>
-          </div>
-          <div class="entry">
-            <div class="when">2019 — 2023</div>
-            <div>
-              <h3>B.Sc. in Data Science and Big Data Technology</h3>
-              <p class="org">School of Artificial Intelligence and Data Science, University of Science and Technology of China</p>
-              <p class="meta">GPA 3.9 / 4.3 · Rank 1 / 40 in the major</p>
+          <div class="cv-group">
+            <p class="cv-head">Experience</p>
+            <div class="entry">
+              <div class="when">2022 — Present</div>
+              <div>
+                <h3>Research Intern</h3>
+                <p class="org">Microsoft Research Asia</p>
+                <p>Video generation, world models and image editing. Earlier work there covered controllable visual-text generation (GlyphControl) and diffusion-based synthesis of handwritten training data.</p>
+              </div>
             </div>
           </div>
         </div>

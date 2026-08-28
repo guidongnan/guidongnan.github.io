@@ -174,6 +174,8 @@
       /* timeline */
       .entry { display: grid; grid-template-columns: 150px 1fr; gap: 26px; padding: 20px 0; border-top: 1px solid var(--line); }
       .entry:first-of-type { border-top: 0; }
+      .cv-group + .cv-group { margin-top: 34px; }
+      .cv-head { font-family: var(--serif); font-size: 16px; font-weight: 600; color: var(--ink); margin: 0 0 2px; }
       .entry .when { font-size: 13.5px; color: var(--muted); font-variant-numeric: tabular-nums; padding-top: 3px; }
       .entry h3 { font-family: var(--serif); font-weight: 600; font-size: 18px; margin: 0 0 3px; }
       .entry .org { font-size: 14.5px; color: var(--accent-ink); font-weight: 500; margin: 0 0 7px; }
@@ -357,38 +359,36 @@
 
       <!-- CV -->
       <section id="cv">
-        <p class="label reveal">教育与经历</p>
+        <p class="label reveal">简历</p>
         <div class="reveal">
-          <div class="entry">
-            <div class="when">2024 — 至今</div>
-            <div>
-              <h3>研究实习生</h3>
-              <p class="org">微软亚洲研究院</p>
-              <p>视频生成、世界模型与图像编辑。</p>
+          <div class="cv-group">
+            <p class="cv-head">教育经历</p>
+            <div class="entry">
+              <div class="when">2023 — 2028</div>
+              <div>
+                <h3>博士研究生 &nbsp;·&nbsp; 中科大 &times; 微软亚洲研究院联合培养博士生项目</h3>
+                <p class="org">中国科学技术大学 电子工程与信息科学系</p>
+                <p>研究方向为视频生成与世界模型，科研工作在微软亚洲研究院完成。</p>
+              </div>
+            </div>
+            <div class="entry">
+              <div class="when">2019 — 2023</div>
+              <div>
+                <h3>理学学士 &nbsp;·&nbsp; 数据科学与大数据技术</h3>
+                <p class="org">中国科学技术大学 人工智能与数据科学学院</p>
+                <p class="meta">GPA 3.9 / 4.3 · 专业排名 1 / 40</p>
+              </div>
             </div>
           </div>
-          <div class="entry">
-            <div class="when">2023 — 2028</div>
-            <div>
-              <h3>博士研究生 &nbsp;·&nbsp; 中科大 &times; 微软亚洲研究院联合培养博士生项目</h3>
-              <p class="org">中国科学技术大学 电子工程与信息科学系</p>
-              <p>研究方向为视频生成与世界模型，科研工作在微软亚洲研究院完成。</p>
-            </div>
-          </div>
-          <div class="entry">
-            <div class="when">2022 — 2023</div>
-            <div>
-              <h3>研究实习生</h3>
-              <p class="org">微软亚洲研究院</p>
-              <p>可控视觉文字生成（GlyphControl），以及用扩散模型为手写汉字识别合成训练数据。</p>
-            </div>
-          </div>
-          <div class="entry">
-            <div class="when">2019 — 2023</div>
-            <div>
-              <h3>理学学士 &nbsp;·&nbsp; 数据科学与大数据技术</h3>
-              <p class="org">中国科学技术大学 人工智能与数据科学学院</p>
-              <p class="meta">GPA 3.9 / 4.3 · 专业排名 1 / 40</p>
+          <div class="cv-group">
+            <p class="cv-head">实习经历</p>
+            <div class="entry">
+              <div class="when">2022 — 至今</div>
+              <div>
+                <h3>研究实习生</h3>
+                <p class="org">微软亚洲研究院</p>
+                <p>视频生成、世界模型与图像编辑。早期在这里做的是可控视觉文字生成（GlyphControl），以及用扩散模型为手写汉字识别合成训练数据。</p>
+              </div>
             </div>
           </div>
         </div>
