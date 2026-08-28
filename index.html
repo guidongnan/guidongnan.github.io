@@ -186,6 +186,25 @@
       /* footer */
       footer { border-top: 1px solid var(--line); padding: 44px 0 72px; }
       .foot-label { margin-bottom: 14px; }
+      .wx { margin: 0 0 26px; }
+      .wx-note { font-size: 15px; color: var(--soft); margin: 0 0 14px; }
+      .wx-open, .wx-ask button {
+        font: inherit; font-size: 13.5px; font-weight: 500; cursor: pointer;
+        padding: 8px 16px; border-radius: 999px;
+        border: 1px solid var(--line-2); color: var(--soft); background: var(--bg);
+        transition: color 0.2s, border-color 0.2s;
+      }
+      .wx-open:hover, .wx-ask button:hover { color: var(--accent-ink); border-color: color-mix(in srgb, var(--accent) 45%, var(--line-2)); }
+      .wx-ask label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 8px; }
+      .wx-row { display: inline-flex; gap: 8px; }
+      .wx-ask input {
+        font: inherit; font-size: 13.5px; width: 148px; padding: 8px 14px;
+        border-radius: 999px; border: 1px solid var(--line-2);
+        background: var(--bg); color: var(--ink);
+      }
+      .wx-msg { display: block; font-size: 12.5px; color: var(--muted); margin-top: 8px; min-height: 1em; }
+      .wx-card { margin: 16px 0 0; }
+      .wx-card img { display: block; width: 230px; max-width: 100%; border: 1px solid var(--line); border-radius: 14px; }
       .colophon { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; font-size: 13px; color: var(--muted); }
       .colophon a { color: var(--muted); text-decoration: none; }
       .colophon a:hover { color: var(--accent-ink); }
@@ -403,6 +422,19 @@
       <footer id="contact">
         <p class="sign reveal">To do it better is easy; the work is doing what could not be done at all.</p>
         <p class="label reveal foot-label">Contact</p>
+        <div class="wx reveal">
+          <p class="wx-note">Feel free to write, or set up a chat.</p>
+          <button type="button" class="wx-open" id="wxOpen">WeChat</button>
+          <form class="wx-ask" id="wxAsk" hidden>
+            <label for="wxKey">My GitHub handle unlocks it</label>
+            <span class="wx-row">
+              <input id="wxKey" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="handle" />
+              <button type="submit">Unlock</button>
+            </span>
+            <span class="wx-msg" id="wxMsg"></span>
+          </form>
+          <figure class="wx-card" id="wxCard" hidden><img id="wxImg" alt="WeChat QR code" /></figure>
+        </div>
         <div class="colophon reveal">
           <span>© <span id="year">2026</span> Dongnan Gui</span>
           <span>
@@ -416,6 +448,44 @@
 
     <script>
       document.getElementById("year").textContent = new Date().getFullYear();
+
+      // The QR ships as ciphertext and is only fetched once someone has the key, so the
+      // image never sits in the repository where a crawler could pick it up.
+      (function () {
+        const open = document.getElementById("wxOpen");
+        const ask = document.getElementById("wxAsk");
+        const card = document.getElementById("wxCard");
+        const msg = document.getElementById("wxMsg");
+        if (!open) return;
+        const M = document.documentElement.lang === "zh" || document.documentElement.lang === "zh-CN"
+          ? { work: "解锁中…", bad: "不对，再试试。", ok: "" }
+          : { work: "unlocking…", bad: "Not it. Try again.", ok: "" };
+        open.onclick = () => { open.hidden = true; ask.hidden = false; document.getElementById("wxKey").focus(); };
+        ask.addEventListener("submit", async (e) => {
+          e.preventDefault();
+          const key = document.getElementById("wxKey").value.trim().toLowerCase();
+          if (!key) return;
+          msg.textContent = M.work;
+          const b64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+          try {
+            const enc = await (await fetch("figs/wechat.enc.json")).json();
+            const base = await crypto.subtle.importKey("raw", new TextEncoder().encode(key), "PBKDF2", false, ["deriveKey"]);
+            const aes = await crypto.subtle.deriveKey(
+              { name: "PBKDF2", salt: b64(enc.salt), iterations: enc.iter, hash: "SHA-256" },
+              base, { name: "AES-GCM", length: 256 }, false, ["decrypt"]
+            );
+            const pt = await crypto.subtle.decrypt({ name: "AES-GCM", iv: b64(enc.iv) }, aes, b64(enc.ct));
+            document.getElementById("wxImg").src = URL.createObjectURL(new Blob([pt], { type: enc.mime }));
+            ask.hidden = true;
+            card.hidden = false;
+          } catch (err) {
+            msg.textContent = M.bad;
+            const i = document.getElementById("wxKey");
+            i.value = "";
+            i.focus();
+          }
+        });
+      })();
 
       // Assembled here rather than written into the markup, so the hint is readable to a
       // visitor but not to anything that only greps the served HTML.
