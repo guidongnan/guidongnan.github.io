@@ -9,8 +9,8 @@
   style.textContent = [
     "html.wp-locked body>.shell,html.wp-locked .aurora{visibility:hidden}",
     "#wpLock{position:fixed;inset:0;z-index:100000;display:grid;place-items:center;background:radial-gradient(120% 120% at 50% 0%,#fbf7ef,#eee4d6);font-family:Inter,'Noto Sans SC',system-ui,sans-serif}",
-    "#wpLock .card{width:min(90vw,340px);background:#fffdf8;border:1px solid #e7ddca;border-radius:20px;padding:30px 26px;box-shadow:0 20px 60px rgba(120,90,50,.18);text-align:center}",
-    "#wpLock .emoji{font-size:40px}",
+    "#wpLock .wp-card{display:block;width:min(90vw,340px);background:#fffdf8;border:1px solid #e7ddca;border-radius:20px;padding:30px 26px;box-shadow:0 20px 60px rgba(120,90,50,.18);text-align:center}",
+    "#wpLock .wp-emoji{font-size:40px;line-height:1.1}",
     "#wpLock h1{font-family:'Noto Serif SC',serif;font-size:22px;margin:10px 0 4px;color:#4b3b28}",
     "#wpLock p{font-size:13px;color:#a08b6d;margin:0 0 16px}",
     "#wpLock input{width:100%;box-sizing:border-box;padding:12px 14px;font-size:15px;border:1px solid #e0d4bd;border-radius:12px;background:#fbf6ee;margin-bottom:12px}",
@@ -23,8 +23,8 @@
   var ov = document.createElement("div");
   ov.id = "wpLock";
   ov.innerHTML =
-    '<form class="card" id="wpForm">' +
-    '<div class="emoji">\uD83D\uDD12</div>' +
+    '<form class="wp-card" id="wpForm">' +
+    '<div class="wp-emoji">\uD83D\uDD12</div>' +
     "<h1>\u53BB\u5904 \u00b7 Waypoints</h1>" +
     '<p id="wpMsg">\u8F93\u5165\u5BC6\u7801\u67E5\u770B \u00b7 Enter password</p>' +
     '<input id="wpPw" type="password" autocomplete="current-password" placeholder="\u5BC6\u7801 / Password" />' +

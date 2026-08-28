@@ -279,14 +279,14 @@ function detectLandmark(lat, lng, feature, address) {
 
 /* ---------- map styles ---------- */
 const OSM = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
-const CARTO = (s) => `https://{s}.basemaps.cartocdn.com/${s}/{z}/{x}/{y}{r}.png`;
-const ATTR_CARTO =
-  '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/attributions">CARTO</a>';
+// CARTO's public basemaps now stamp "API KEY REQUIRED" on every tile; Esri's are still key-free.
+const ESRI = (s) => `https://server.arcgisonline.com/ArcGIS/rest/services/${s}/MapServer/tile/{z}/{y}/{x}`;
+const ATTR_ESRI = '&copy; <a href="https://www.esri.com/">Esri</a>';
 const ATTR_OSM = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
 
 const MAP_STYLES = [
-  { id: "daylight", name: "素白", en: "Daylight", url: CARTO("light_all"), sub: "abcd", retina: true, attr: ATTR_CARTO, swatch: "#eae4d8", filter: "sepia(.12) saturate(.9) brightness(1.02)" },
-  { id: "voyager", name: "旅人", en: "Voyager", url: CARTO("rastertiles/voyager"), sub: "abcd", retina: true, attr: ATTR_CARTO, swatch: "#e7dfce", filter: "saturate(.82) brightness(1.02)" },
+  { id: "daylight", name: "素白", en: "Daylight", url: ESRI("Canvas/World_Light_Gray_Base"), sub: "abc", retina: false, attr: ATTR_ESRI, swatch: "#eae4d8", filter: "sepia(.12) saturate(.9) brightness(1.02)" },
+  { id: "voyager", name: "旅人", en: "Voyager", url: ESRI("World_Street_Map"), sub: "abc", retina: false, attr: ATTR_ESRI, swatch: "#e7dfce", filter: "saturate(.82) brightness(1.02)" },
   { id: "parchment", name: "旧纸", en: "Parchment", url: OSM, sub: "abc", retina: false, attr: ATTR_OSM, swatch: "#e0cfa8", filter: "sepia(.42) saturate(.72) brightness(1.04) contrast(.94) hue-rotate(-8deg)" },
 ];
 
