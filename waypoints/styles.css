@@ -806,6 +806,13 @@ body {
   color: var(--muted);
   margin-left: 3px;
 }
+.date-chip .wx {
+  font-style: normal;
+  color: var(--muted);
+  margin-left: 6px;
+  padding-left: 6px;
+  border-left: 1px solid var(--line);
+}
 .detail-actions {
   display: flex;
   gap: 8px;

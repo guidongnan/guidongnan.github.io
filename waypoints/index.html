@@ -72,15 +72,6 @@
         </div>
 
         <div class="list" id="placeList" aria-label="Place list"></div>
-
-        <footer class="rail-foot">
-          <button id="addBtn" class="ghost-btn primary" type="button" data-i18n="foot_new">＋ New spot</button>
-          <div class="foot-tools">
-            <button id="importBtn" class="ghost-btn" type="button" data-i18n="foot_import">Import</button>
-            <button id="exportBtn" class="ghost-btn" type="button" data-i18n="foot_export">Export</button>
-            <button id="resetBtn" class="ghost-btn danger" type="button" data-i18n="foot_reset">Reset</button>
-          </div>
-        </footer>
       </aside>
 
       <!-- ===================== MAP STAGE ===================== -->
@@ -93,12 +84,9 @@
             <span id="styleName">Daylight</span>
           </button>
           <button id="surpriseBtn" class="tool round" type="button" data-i18n-title="tool_surprise" title="Surprise me (R)">🎲</button>
-          <button id="pinModeBtn" class="tool round" type="button" data-i18n-title="tool_pin" title="Drop a pin">📍</button>
           <button id="territoryBtn" class="tool round active" type="button" data-i18n-title="tool_territory" title="Visited territory (B)">🗺️</button>
           <button id="locateBtn" class="tool round" type="button" data-i18n-title="tool_locate" title="Fit all">🌍</button>
         </div>
-
-        <div class="pin-hint" id="pinHint" data-i18n="pin_hint" hidden>Tap the map to place a spot · Esc to cancel</div>
       </section>
 
       <!-- ===================== DETAIL PANEL ===================== -->
@@ -179,7 +167,6 @@
     </div>
 
     <div class="toasts" id="toasts" aria-live="polite"></div>
-    <input type="file" id="importFile" accept="application/json,.json" hidden />
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="boundaries.js"></script>

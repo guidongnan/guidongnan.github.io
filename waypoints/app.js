@@ -340,7 +340,6 @@ const state = {
   category: "all",
   status: "all",
   activeId: null,
-  pinMode: false,
 };
 
 /* ---------- DOM ---------- */
@@ -358,15 +357,12 @@ const el = {
   styleBtn: $("#styleBtn"),
   styleName: $("#styleName"),
   styleSwatch: $("#styleSwatch"),
-  pinHint: $("#pinHint"),
-  pinModeBtn: $("#pinModeBtn"),
   territoryBtn: $("#territoryBtn"),
   toasts: $("#toasts"),
   modal: $("#modal"),
   editor: $("#editor"),
   editorTitle: $("#editorTitle"),
   editorDelete: $("#editorDelete"),
-  importFile: $("#importFile"),
 };
 
 /* ---------- helpers ---------- */
@@ -448,13 +444,8 @@ function initMap() {
   // drop the panels' backdrop-blur while the map is moving (mobile flicker fix)
   map.on("movestart zoomstart dragstart", markBusy);
   map.on("moveend zoomend dragend", clearBusySoon);
-  map.on("click", (e) => {
-    if (state.pinMode) {
-      openEditor(null, [round(e.latlng.lat), round(e.latlng.lng)]);
-      setPinMode(false);
-    } else if (state.activeId) {
-      select(null);
-    }
+  map.on("click", () => {
+    if (state.activeId) select(null);
   });
 }
 const round = (n) => Math.round(n * 1e5) / 1e5;
@@ -601,6 +592,48 @@ function highlightCard(id, on) {
 }
 
 /* ---------- detail ---------- */
+/* ---------- weather on visit days ---------- */
+// Baked into the place data at build time by photo-atlas/_build/fetch-weather.js, so the
+// map never has to call a weather API at view time. Values are [wmoCode, tMin, tMax].
+const WX_CODES = {
+  0: ["\u2600\uFE0F", "\u6674", "Clear"],
+  1: ["\uD83C\uDF24\uFE0F", "\u6674\u95f4\u591a\u4e91", "Mainly clear"],
+  2: ["\u26C5", "\u591a\u4e91", "Partly cloudy"],
+  3: ["\u2601\uFE0F", "\u9634", "Overcast"],
+  45: ["\uD83C\uDF2B\uFE0F", "\u96fe", "Fog"],
+  48: ["\uD83C\uDF2B\uFE0F", "\u96fe\u51c7", "Rime fog"],
+  51: ["\uD83C\uDF26\uFE0F", "\u5c0f\u6bdb\u6bdb\u96e8", "Light drizzle"],
+  53: ["\uD83C\uDF26\uFE0F", "\u6bdb\u6bdb\u96e8", "Drizzle"],
+  55: ["\uD83C\uDF27\uFE0F", "\u6d53\u6bdb\u6bdb\u96e8", "Dense drizzle"],
+  56: ["\uD83C\uDF28\uFE0F", "\u51bb\u6bdb\u6bdb\u96e8", "Freezing drizzle"],
+  57: ["\uD83C\uDF28\uFE0F", "\u6d53\u51bb\u6bdb\u6bdb\u96e8", "Freezing drizzle"],
+  61: ["\uD83C\uDF26\uFE0F", "\u5c0f\u96e8", "Light rain"],
+  63: ["\uD83C\uDF27\uFE0F", "\u4e2d\u96e8", "Rain"],
+  65: ["\uD83C\uDF27\uFE0F", "\u5927\u96e8", "Heavy rain"],
+  66: ["\uD83C\uDF28\uFE0F", "\u51bb\u96e8", "Freezing rain"],
+  67: ["\uD83C\uDF28\uFE0F", "\u5f3a\u51bb\u96e8", "Heavy freezing rain"],
+  71: ["\uD83C\uDF28\uFE0F", "\u5c0f\u96ea", "Light snow"],
+  73: ["\u2744\uFE0F", "\u4e2d\u96ea", "Snow"],
+  75: ["\u2744\uFE0F", "\u5927\u96ea", "Heavy snow"],
+  77: ["\u2744\uFE0F", "\u7c73\u96ea", "Snow grains"],
+  80: ["\uD83C\uDF26\uFE0F", "\u9635\u96e8", "Rain showers"],
+  81: ["\uD83C\uDF27\uFE0F", "\u5f3a\u9635\u96e8", "Heavy showers"],
+  82: ["\u26C8\uFE0F", "\u7279\u5927\u9635\u96e8", "Violent showers"],
+  85: ["\uD83C\uDF28\uFE0F", "\u9635\u96ea", "Snow showers"],
+  86: ["\u2744\uFE0F", "\u5f3a\u9635\u96ea", "Heavy snow showers"],
+  95: ["\u26C8\uFE0F", "\u96f7\u96e8", "Thunderstorm"],
+  96: ["\u26C8\uFE0F", "\u96f7\u96e8\u4f34\u51b0\u96ea", "Thunderstorm with hail"],
+  99: ["\u26C8\uFE0F", "\u96f7\u66b4\u4f34\u51b0\u96ea", "Thunderstorm with hail"],
+};
+
+function wxChip(p, date, lang) {
+  const w = p.wx && p.wx[date];
+  if (!w) return "";
+  const meta = WX_CODES[w[0]];
+  if (!meta) return "";
+  return ` <i class="wx" title="${esc(lang === "en" ? meta[2] : meta[1])}">${meta[0]} ${Math.round(w[1])}\u00b0\u2013${Math.round(w[2])}\u00b0</i>`;
+}
+
 function renderDetail(p) {
   document.body.classList.toggle("has-detail", !!p);
   if (!p) {
@@ -621,7 +654,7 @@ function renderDetail(p) {
   const coverHtml = p.cover ? `<figure class="detail-cover"><img src="${esc(p.cover)}" alt="${esc(np.title)}" onerror="this.closest('.detail-cover').remove()"></figure>` : "";
   const altHtml = (typeof p.alt === "number" && p.alt >= 1 && p.alt <= 3000) ? `<div class="detail-row"><span class="k">${t("d_alt")}</span><span class="v">~${Math.round(p.alt)} m</span></div>` : "";
   const dts = Array.isArray(p.dates) ? p.dates : [];
-  const datesHtml = dts.length ? `<div class="detail-dates"><div class="dates-head">${t("d_visits")} \u00b7 ${dts.length}</div><div class="dates-list">${dts.slice().reverse().map((dt) => { const dd = new Date(dt + "T00:00:00"); const wd = isNaN(dd) ? "" : WEEKDAY[lang][dd.getDay()]; return `<span class="date-chip">${esc(dt)}${wd ? ` <em>${wd}</em>` : ""}</span>`; }).join("")}</div></div>` : "";
+  const datesHtml = dts.length ? `<div class="detail-dates"><div class="dates-head">${t("d_visits")} \u00b7 ${dts.length}</div><div class="dates-list">${dts.slice().reverse().map((dt) => { const dd = new Date(dt + "T00:00:00"); const wd = isNaN(dd) ? "" : WEEKDAY[lang][dd.getDay()]; return `<span class="date-chip">${esc(dt)}${wd ? ` <em>${wd}</em>` : ""}${wxChip(p, dt, lang)}</span>`; }).join("")}</div></div>` : "";
   el.detail.innerHTML = `
     <button class="sheet-handle" type="button" aria-label="${t("btn_cancel")}"><span class="grip"></span></button>
     ${coverHtml}
@@ -640,21 +673,9 @@ function renderDetail(p) {
       <div class="detail-row"><span class="k">${t("d_coords")}</span><span class="v">${p.coords[0].toFixed(4)}, ${p.coords[1].toFixed(4)}</span></div>
       ${p.note ? `<div class="detail-note">${esc(locNote(p.note))}</div>` : ""}
       ${datesHtml}
-      <div class="detail-actions">
-        <button class="ghost-btn primary" data-act="visit">${p.status === "visited" ? t("act_unvisit") : t("act_visit")}</button>
-        <button class="ghost-btn" data-act="fav">${p.fav ? t("act_unfav") : t("act_fav")}</button>
-      </div>
-      <div class="detail-actions">
-        <button class="ghost-btn" data-act="edit">${t("act_edit")}</button>
-        <button class="ghost-btn danger" data-act="delete">${t("act_delete")}</button>
-      </div>
     </div>`;
 
   el.detail.querySelector(".detail-close").onclick = () => select(null);
-  el.detail.querySelector('[data-act="visit"]').onclick = () => toggleVisited(p.id);
-  el.detail.querySelector('[data-act="fav"]').onclick = () => toggleFav(p.id);
-  el.detail.querySelector('[data-act="edit"]').onclick = () => openEditor(p);
-  el.detail.querySelector('[data-act="delete"]').onclick = () => removePlace(p.id);
 }
 
 /* ---------- stats ---------- */
@@ -846,14 +867,6 @@ function submitEditor(e) {
   render();
   select(id);
   toast(editingId ? "已保存修改" : `已添加 ${data.name}`, { emoji: "📍" });
-}
-
-/* ---------- pin mode ---------- */
-function setPinMode(on) {
-  state.pinMode = on;
-  el.pinModeBtn.classList.toggle("active", on);
-  el.pinHint.hidden = !on;
-  document.getElementById("map").style.cursor = on ? "crosshair" : "";
 }
 
 /* ---------- import / export / reset ---------- */
@@ -1079,19 +1092,9 @@ function wire() {
     if (card) hoverMarker(card.dataset.id, false);
   });
 
-  $("#addBtn").onclick = () => openEditor(null);
-  $("#exportBtn").onclick = exportJSON;
-  $("#importBtn").onclick = () => el.importFile.click();
-  $("#resetBtn").onclick = resetData;
-  el.importFile.onchange = (e) => {
-    if (e.target.files[0]) importJSON(e.target.files[0]);
-    e.target.value = "";
-  };
-
   el.styleBtn.onclick = cycleMapStyle;
   $("#surpriseBtn").onclick = surprise;
   $("#locateBtn").onclick = () => fitTo(filtered());
-  el.pinModeBtn.onclick = () => setPinMode(!state.pinMode);
   if (el.territoryBtn) el.territoryBtn.onclick = toggleTerritory;
   $("#themeToggle").onclick = cycleTheme;
   $("#langToggle").onclick = cycleLang;
@@ -1125,7 +1128,6 @@ function onKey(e) {
   const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName);
   if (e.key === "Escape") {
     if (!el.modal.hidden) closeEditor();
-    else if (state.pinMode) setPinMode(false);
     else if (state.activeId) select(null);
     return;
   }
@@ -1133,8 +1135,6 @@ function onKey(e) {
   if (e.key === "/") {
     e.preventDefault();
     el.search.focus();
-  } else if (e.key.toLowerCase() === "n") {
-    openEditor(null);
   } else if (e.key.toLowerCase() === "r") {
     surprise();
   } else if (e.key.toLowerCase() === "m") {
