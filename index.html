@@ -140,12 +140,13 @@
       .work-desc { display: block; margin-top: 11px; font-size: 15px; line-height: 1.62; color: var(--soft); max-width: 58ch; }
       .venue { display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent-ink); background: color-mix(in srgb, var(--accent) 8%, transparent); border: 1px solid color-mix(in srgb, var(--accent) 20%, transparent); padding: 3px 9px; border-radius: 6px; }
       .venue.review { color: var(--muted); background: transparent; border-color: var(--line-2); }
-      .venue.core { margin-left: 7px; color: #fff; background: var(--accent); border-color: var(--accent); }
       .work-title { display: block; font-family: var(--serif); font-weight: 500; font-size: 20px; line-height: 1.28; letter-spacing: -0.008em; margin: 12px 0 7px; color: var(--ink); }
       .work:hover .work-title { color: var(--accent-ink); }
       .authors { font-size: 14px; color: var(--muted); }
       .authors b { color: var(--soft); font-weight: 600; }
       .authors .eq { color: var(--accent-ink); }
+      /* on its own line, or the leading asterisk reads as a mark on the last author */
+      .authors .note { display: block; margin-top: 4px; }
 
       /* projects */
       .proj { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 36px; align-items: center; text-decoration: none; }
@@ -310,7 +311,7 @@
             <span class="work-body">
               <span class="venue">NeurIPS 2023</span>
               <span class="work-title">GlyphControl: Glyph Conditional Control for Visual Text Generation</span>
-              <span class="authors">Yukang Yang<span class="eq">*</span>, <b>Dongnan Gui</b><span class="eq">*</span>, Yuhui Yuan, Haisong Ding, Han Hu, Kai Chen<span class="venue core">Core contributor</span></span>
+              <span class="authors">Yukang Yang<span class="eq">*</span>, <b>Dongnan Gui</b><span class="eq">*</span>, Yuhui Yuan, Weicong Liang, Haisong Ding, Han Hu, Kai Chen<span class="note"><span class="eq">*</span>&nbsp;core contribution</span></span>
               <span class="work-desc">Legible text in a generated image without retraining the generator: the words are rendered to a glyph image and fed to a ControlNet beside a frozen Stable Diffusion. Ships LAION-Glyph, a 10M-pair benchmark.</span>
             </span>
           </a>
