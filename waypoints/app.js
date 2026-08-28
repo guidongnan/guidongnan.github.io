@@ -23,8 +23,7 @@ const I18N = {
   en: {
     brand: "Waypoints", brand_sub: "Personal Atlas",
     search_ph: "Search places, cities, tags…",
-    seg_all: "All", seg_want: "Wishlist", seg_visited: "Visited",
-    stat_saved: "Saved", stat_visited: "Visited", stat_explored: "Explored",
+    seg_all: "All", seg_cn: "China", seg_intl: "Overseas",
     foot_new: "＋ New spot", foot_import: "Import", foot_export: "Export", foot_reset: "Reset",
     tool_style: "Map style (M)", tool_surprise: "Surprise me (R)", tool_pin: "Drop a pin",
     tool_territory: "Visited territory (B)", tool_locate: "Fit all",
@@ -56,8 +55,7 @@ const I18N = {
   zh: {
     brand: "去处", brand_sub: "WAYPOINTS",
     search_ph: "搜索地点、城市、标签…",
-    seg_all: "全部", seg_want: "想去", seg_visited: "去过",
-    stat_saved: "收藏", stat_visited: "去过", stat_explored: "足迹",
+    seg_all: "全部", seg_cn: "国内", seg_intl: "国外",
     foot_new: "＋ 新地点", foot_import: "导入", foot_export: "导出", foot_reset: "重置",
     tool_style: "地图风格 (M)", tool_surprise: "随机去处 (R)", tool_pin: "点图添加地点",
     tool_territory: "去过版图·深色显示 (B)", tool_locate: "回到全部",
@@ -338,7 +336,7 @@ const state = {
   settings: loadSettings(),
   search: "",
   category: "all",
-  status: "all",
+  region: "all",
   activeId: null,
 };
 
@@ -350,9 +348,6 @@ const el = {
   statusSeg: $("#statusSeg"),
   search: $("#search"),
   list: $("#placeList"),
-  statTotal: $("#statTotal"),
-  statVisited: $("#statVisited"),
-  statPct: $("#statPct"),
   detail: $("#detail"),
   styleBtn: $("#styleBtn"),
   styleName: $("#styleName"),
@@ -391,28 +386,16 @@ function toast(msg, { emoji = "✨", action } = {}) {
   setTimeout(dismiss, action ? 5200 : 2800);
 }
 
-function animateNumber(node, to, suffix = "") {
-  const from = parseFloat(node.dataset.val || "0") || 0;
-  node.dataset.val = to;
-  const start = performance.now();
-  const dur = 550;
-  const step = (now) => {
-    const p = Math.min(1, (now - start) / dur);
-    const eased = 1 - Math.pow(1 - p, 3);
-    node.textContent = Math.round(from + (to - from) * eased) + suffix;
-    if (p < 1) requestAnimationFrame(step);
-  };
-  requestAnimationFrame(step);
-}
-
 /* ---------- filtering ---------- */
+// a landmark carries "景点" ahead of its country, so take the first tag that is not that
+const countryOf = (p) => (p.tags || []).find((tg) => tg !== "景点") || "";
+
 function filtered() {
   const q = state.search.trim().toLowerCase();
   return state.places.filter((p) => {
     if (state.category !== "all" && p.category !== state.category) return false;
-    if (state.status === "visited" && p.status !== "visited") return false;
-    if (state.status === "want" && p.status !== "want") return false;
-    if (state.status === "fav" && !p.fav) return false;
+    if (state.region === "cn" && countryOf(p) !== "中国") return false;
+    if (state.region === "intl" && countryOf(p) === "中国") return false;
     if (q) {
       const m = nmeta(p);
       const hay = [m.zh, m.en, m.local, p.city, (p.tags || []).join(" "), p.note].join(" ").toLowerCase();
@@ -678,22 +661,11 @@ function renderDetail(p) {
   el.detail.querySelector(".detail-close").onclick = () => select(null);
 }
 
-/* ---------- stats ---------- */
-function renderStats() {
-  const total = state.places.length;
-  const visited = state.places.filter((p) => p.status === "visited").length;
-  animateNumber(el.statTotal, total);
-  animateNumber(el.statVisited, visited);
-  animateNumber(el.statPct, total ? Math.round((visited / total) * 100) : 0, "%");
-}
-
 /* ---------- visited territories (choropleth) ---------- */
 let territoryLayer = null;
 let territorySig = "";
 function refreshTerritory() {
   if (!map || !window.WP_BOUNDARIES) return;
-  // a place's country tag may sit behind the "景点" tag on landmarks; shade by its CITY, not its name
-  const countryOf = (p) => (p.tags || []).find((t) => t !== "景点") || "";
   const chinaNames = [...new Set(
     state.places.filter((p) => countryOf(p) === "中国").map((p) => (p.city || p.name || "").trim()).filter(Boolean)
   )].sort();
@@ -741,7 +713,6 @@ function render(fit = false) {
   renderChips();
   renderList(list);
   renderMarkers(list);
-  renderStats();
   refreshTerritory();
   if (fit) fitTo(list);
 }
@@ -1069,7 +1040,7 @@ function wire() {
     const b = e.target.closest(".seg");
     if (!b) return;
     el.statusSeg.querySelectorAll(".seg").forEach((x) => x.classList.toggle("active", x === b));
-    state.status = b.dataset.status;
+    state.region = b.dataset.region;
     render(true);
   });
   let searchTimer;
