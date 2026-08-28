@@ -1,7 +1,7 @@
 # guidongnan.github.io
 
 Personal site of Dongnan Gui (桂栋南), a Ph.D. student in the USTC–MSRA joint program, working on
-video generation, autoregressive video and world models.
+video generation and world models.
 
 Live at **<https://guidongnan.github.io/>**
 
