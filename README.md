@@ -1,37 +1,40 @@
-## Welcome to GitHub Pages
+# guidongnan.github.io
 
-You can use the [editor on GitHub](https://github.com/guidongnan/guidongnan.github.io/edit/main/README.md) to maintain and preview the content for your website in Markdown files.
+Personal site of Dongnan Gui (桂栋南), a Ph.D. student in the USTC–MSRA joint program, working on
+video generation, autoregressive video and world models.
 
-Whenever you commit to this repository, GitHub Pages will run [Jekyll](https://jekyllrb.com/) to rebuild the pages in your site, from the content in your Markdown files.
+Live at **<https://guidongnan.github.io/>**
 
-### Markdown
+## Contents
 
-Markdown is a lightweight and easy-to-use syntax for styling your writing. It includes conventions for
+| Path | What it holds |
+| --- | --- |
+| `index.html`, `index.zh.html` | Homepage, English and Chinese |
+| `notes/` | Tutorial site: 13 long-form Chinese tutorials, 13 English companions, and 1,100+ notes on individual papers |
+| `blog/` | Short essays on video generation and world models, each written in both languages |
+| `waypoints/` | Personal travel atlas, password protected |
+| `figs/` | Figures used on the homepage |
 
-```markdown
-Syntax highlighted code block
+## This repository stores build output, not sources
 
-# Header 1
-## Header 2
-### Header 3
+Nothing here is compiled by GitHub. Every file is generated elsewhere and committed exactly as it
+will be served:
 
-- Bulleted
-- List
+* The homepage is hand-written HTML, one file per language.
+* `notes/` is built with [VitePress](https://vitepress.dev/) and committed as the rendered site.
+  Its asset paths are absolute under `/notes/`, which is why this has to be the user-pages
+  repository and not a project repository.
+* `waypoints/` ships as AES-256-GCM ciphertext with a PBKDF2-SHA256 derived key. Place names,
+  dates and cover photos are decrypted in the browser after the password is entered, so none of
+  that is readable from this repository. The map is a read-only display; the weather shown for
+  each visit day is baked into the payload at build time, so viewing a place sends nothing to any
+  third party.
 
-1. Numbered
-2. List
+Pages is configured as **Settings → Pages → Deploy from a branch → `main` / `/ (root)`**, and
+`.nojekyll` turns off Jekyll processing. There is deliberately no Actions workflow: the sources
+that produce `notes/` do not live in this repository, so a build workflow would only ever fail.
 
-**Bold** and _Italic_ and `Code` text
+## License
 
-[Link](url) and ![Image](src)
-```
-
-For more details see [Basic writing and formatting syntax](https://docs.github.com/en/github/writing-on-github/getting-started-with-writing-and-formatting-on-github/basic-writing-and-formatting-syntax).
-
-### Jekyll Themes
-
-Your Pages site will use the layout and styles from the Jekyll theme you have selected in your [repository settings](https://github.com/guidongnan/guidongnan.github.io/settings/pages). The name of this theme is saved in the Jekyll `_config.yml` configuration file.
-
-### Support or Contact
-
-Having trouble with Pages? Check out our [documentation](https://docs.github.com/categories/github-pages-basics/) or [contact support](https://support.github.com/contact) and we’ll help you sort it out.
+Text and figures are © Dongnan Gui. The paper notes summarise third-party research and link to the
+original publications, which remain the property of their authors.
