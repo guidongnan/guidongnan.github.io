@@ -357,6 +357,10 @@ const el = {
 };
 
 /* ---------- helpers ---------- */
+const onClick = (target, fn) => {
+  const node = typeof target === "string" ? $(target) : target;
+  if (node) node.onclick = fn;
+};
 const uid = () => "p" + Math.random().toString(36).slice(2, 9);
 const esc = (s) =>
   String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -1043,20 +1047,22 @@ function wire() {
   });
 
   el.styleBtn.onclick = cycleMapStyle;
-  $("#surpriseBtn").onclick = surprise;
-  $("#locateBtn").onclick = () => fitTo(filtered());
-  $("#langToggle").onclick = cycleLang;
+  // a returning visitor can hold a cached script that predates a markup change; binding
+  // blind would throw here and abort boot(), leaving an empty page
+  onClick("#surpriseBtn", surprise);
+  onClick("#locateBtn", () => fitTo(filtered()));
+  onClick("#langToggle", cycleLang);
 
   el.editor.addEventListener("submit", submitEditor);
-  $("#editorCancel").onclick = closeEditor;
-  $("#editorClose").onclick = closeEditor;
-  el.editorDelete.onclick = () => {
+  onClick("#editorCancel", closeEditor);
+  onClick("#editorClose", closeEditor);
+  onClick(el.editorDelete, () => {
     if (editingId) {
       const id = editingId;
       closeEditor();
       removePlace(id);
     }
-  };
+  });
   el.modal.addEventListener("click", (e) => {
     if (e.target === el.modal) closeEditor();
   });
