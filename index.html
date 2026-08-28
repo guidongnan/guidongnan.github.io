@@ -166,6 +166,7 @@
       .proj-desc { display: block; font-size: 15.5px; color: var(--soft); max-width: 54ch; }
       .proj-facts { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 14px; }
       .proj-facts span { font-size: 12.5px; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; font-variant-numeric: tabular-nums; }
+      .proj-facts .hint { border-style: dashed; border-color: var(--accent-ink); color: var(--accent-ink); }
       .proj + .proj { margin-top: 46px; }
       .proj + .proj .proj-shot { order: 2; }
       .kind.quiet { color: var(--muted); background: transparent; border-color: var(--line-2); }
@@ -355,7 +356,7 @@
             <span class="kind quiet">Personal</span>
             <span class="proj-title">Waypoints<span class="zh-sub">行迹</span></span>
             <span class="proj-desc">An atlas of everywhere I have been, built from an Android app I wrote that reads the GPS out of my own photo library, clusters the points into places, and chooses each place's cover by scoring the photographs rather than by filename.</span>
-            <span class="proj-facts"><span>244 places</span><span>Kotlin + Leaflet</span><span>encrypted client-side</span></span>
+            <span class="proj-facts"><span>244 places</span><span>Kotlin + Leaflet</span><span>encrypted client-side</span><span class="hint" data-k="cGFzc3dvcmQgPSBteSBHaXRIdWIgaGFuZGxl" hidden></span></span>
           </span>
         </a>
       </section>
@@ -415,6 +416,13 @@
 
     <script>
       document.getElementById("year").textContent = new Date().getFullYear();
+
+      // Assembled here rather than written into the markup, so the hint is readable to a
+      // visitor but not to anything that only greps the served HTML.
+      document.querySelectorAll("[data-k]").forEach((n) => {
+        n.textContent = new TextDecoder().decode(Uint8Array.from(atob(n.dataset.k), (c) => c.charCodeAt(0)));
+        n.removeAttribute("hidden");
+      });
       const nav = document.getElementById("nav");
       addEventListener("scroll", () => nav.classList.toggle("scrolled", scrollY > 8), { passive: true });
       const io = new IntersectionObserver(

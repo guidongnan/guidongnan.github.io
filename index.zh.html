@@ -166,6 +166,7 @@
       .proj-desc { display: block; font-size: 15.5px; color: var(--soft); max-width: 54ch; }
       .proj-facts { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 14px; }
       .proj-facts span { font-size: 12.5px; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; font-variant-numeric: tabular-nums; }
+      .proj-facts .hint { border-style: dashed; border-color: var(--accent-ink); color: var(--accent-ink); }
       .proj + .proj { margin-top: 46px; }
       .proj + .proj .proj-shot { order: 2; }
       .kind.quiet { color: var(--muted); background: transparent; border-color: var(--line-2); }
@@ -351,7 +352,7 @@
             <span class="kind quiet">个人项目</span>
             <span class="proj-title">行迹<span class="zh-sub">Waypoints</span></span>
             <span class="proj-desc">一份「我去过的所有地方」的地图册。它由我自己写的一个 Android 应用生成：读取相册照片里的 GPS，把坐标点聚成一个个地点，再靠给照片打分而不是看文件名来挑每个地点的封面。</span>
-            <span class="proj-facts"><span>244 个地点</span><span>Kotlin + Leaflet</span><span>客户端加密</span></span>
+            <span class="proj-facts"><span>244 个地点</span><span>Kotlin + Leaflet</span><span>客户端加密</span><span class="hint" data-k="5a+G56CB5bCx5piv5oiR55qEIEdpdEh1YiDnlKjmiLflkI0=" hidden></span></span>
           </span>
         </a>
       </section>
@@ -411,6 +412,13 @@
 
     <script>
       document.getElementById("year").textContent = new Date().getFullYear();
+
+      // Assembled here rather than written into the markup, so the hint is readable to a
+      // visitor but not to anything that only greps the served HTML.
+      document.querySelectorAll("[data-k]").forEach((n) => {
+        n.textContent = new TextDecoder().decode(Uint8Array.from(atob(n.dataset.k), (c) => c.charCodeAt(0)));
+        n.removeAttribute("hidden");
+      });
       const nav = document.getElementById("nav");
       addEventListener("scroll", () => nav.classList.toggle("scrolled", scrollY > 8), { passive: true });
       const io = new IntersectionObserver(
