@@ -26,8 +26,8 @@ const I18N = {
     seg_all: "All", seg_cn: "China", seg_intl: "Overseas",
     foot_new: "＋ New spot", foot_import: "Import", foot_export: "Export", foot_reset: "Reset",
     tool_style: "Map style (M)", tool_surprise: "Surprise me (R)", tool_pin: "Drop a pin",
-    tool_territory: "Visited territory (B)", tool_locate: "Fit all",
-    theme_title: "Theme (T)", lang_title: "Language / 语言", collapse_title: "Collapse", reopen: "🧭 List",
+    tool_locate: "Fit all",
+    lang_title: "Language / 语言", collapse_title: "Collapse", reopen: "🧭 List",
     pin_hint: "Tap the map to place a spot · Esc to cancel",
     cat_nature: "Nature", cat_city: "City", cat_heritage: "Heritage", cat_food: "Food", cat_beach: "Beach",
     cat_adventure: "Adventure", cat_art: "Art", cat_landmark: "Landmark", cat_other: "Other",
@@ -42,14 +42,13 @@ const I18N = {
     f_tags: "Tags (comma separated)", f_note: "Note",
     btn_delete: "Delete", btn_cancel: "Cancel", btn_save: "Save",
     ph_name: "e.g. Lingyin Temple", ph_local: "e.g. Lingyin Si", ph_note: "Why you want to go…",
-    t_style: "Map style · {n}", t_theme: "Theme · {n}", t_lang: "Language · English",
     t_import_ok: "Imported · {n} places", t_import_detailed: "Done · {a} landmarks / {b} cities",
     t_import_fail: "Import failed: bad file format", t_export: "Exported {n} places",
     t_reset_confirm: "Reset to sample data? This overwrites everything.", t_reset_do: "Reset",
     t_reset_done: "Sample data restored", t_deleted: "Deleted {name}", t_undo: "Undo", t_restored: "Restored {name}",
     t_visited: "Visited {name} ✓", t_unvisited: "{name} back to wishlist", t_fav: "Favorited · {name}",
     t_unfav: "Unfavorited · {name}", t_saved: "Changes saved", t_added: "Added {name}", t_take: "Off to {name}",
-    t_coord_bad: "Enter valid coordinates", t_territory_on: "Visited territory on", t_territory_off: "Visited territory hidden",
+    t_coord_bad: "Enter valid coordinates",
     t_map_missing: "Map library didn't load — check your network and refresh", t_names_missing: "Place data not loaded, please refresh",
   },
   zh: {
@@ -58,8 +57,8 @@ const I18N = {
     seg_all: "全部", seg_cn: "国内", seg_intl: "国外",
     foot_new: "＋ 新地点", foot_import: "导入", foot_export: "导出", foot_reset: "重置",
     tool_style: "地图风格 (M)", tool_surprise: "随机去处 (R)", tool_pin: "点图添加地点",
-    tool_territory: "去过版图·深色显示 (B)", tool_locate: "回到全部",
-    theme_title: "切换主题 (T)", lang_title: "Language / 语言", collapse_title: "收起面板", reopen: "🧭 列表",
+    tool_locate: "回到全部",
+    lang_title: "Language / 语言", collapse_title: "收起面板", reopen: "🧭 列表",
     pin_hint: "点击地图放置新地点 · Esc 取消",
     cat_nature: "自然", cat_city: "城市", cat_heritage: "古迹", cat_food: "美食", cat_beach: "海滨",
     cat_adventure: "探险", cat_art: "艺术", cat_landmark: "景点", cat_other: "其他",
@@ -74,14 +73,13 @@ const I18N = {
     f_tags: "标签（逗号分隔）", f_note: "笔记",
     btn_delete: "删除", btn_cancel: "取消", btn_save: "保存",
     ph_name: "如 灵隐寺", ph_local: "如 Lingyin Si", ph_note: "为什么想去这里…",
-    t_style: "地图风格 · {n}", t_theme: "主题 · {n}", t_lang: "语言 · 中文",
     t_import_ok: "导入成功 · {n} 个地点", t_import_detailed: "导入完成 · {a} 个著名景点 / {b} 个城市",
     t_import_fail: "导入失败：文件格式不对", t_export: "已导出 {n} 个地点",
     t_reset_confirm: "确认恢复示例数据？会覆盖当前所有地点", t_reset_do: "确认重置",
     t_reset_done: "已恢复示例数据", t_deleted: "已删除 {name}", t_undo: "撤销", t_restored: "已恢复 {name}",
     t_visited: "去过 {name} ✓", t_unvisited: "{name} 移回想去", t_fav: "心水 · {name}",
     t_unfav: "取消心水 · {name}", t_saved: "已保存修改", t_added: "已添加 {name}", t_take: "带你去 · {name}",
-    t_coord_bad: "请填写有效的经纬度", t_territory_on: "已开启去过版图", t_territory_off: "已隐藏去过版图",
+    t_coord_bad: "请填写有效的经纬度",
     t_map_missing: "地图库未加载，检查网络后刷新", t_names_missing: "景点数据未加载，请刷新页面重试",
   },
 };
@@ -163,7 +161,6 @@ function cycleLang() {
   applyLang();
   render();
   if (state.activeId) renderDetail(state.places.find((x) => x.id === state.activeId) || null);
-  toast(t("t_lang"), { emoji: "🌐" });
 }
 
 /* ---------- landmark database (famous 景点, matched by proximity to a photo) ---------- */
@@ -352,7 +349,6 @@ const el = {
   styleBtn: $("#styleBtn"),
   styleName: $("#styleName"),
   styleSwatch: $("#styleSwatch"),
-  territoryBtn: $("#territoryBtn"),
   toasts: $("#toasts"),
   modal: $("#modal"),
   editor: $("#editor"),
@@ -457,7 +453,6 @@ function cycleMapStyle() {
   state.settings.style = MAP_STYLES[(i + 1) % MAP_STYLES.length].id;
   saveSettings();
   applyMapStyle();
-  toast(t("t_style", { n: styleLabel(currentStyle()) }), { emoji: "🗺️" });
 }
 
 function archOf(p) {
@@ -670,15 +665,13 @@ function refreshTerritory() {
     state.places.filter((p) => countryOf(p) === "中国").map((p) => (p.city || p.name || "").trim()).filter(Boolean)
   )].sort();
   const foreign = [...new Set(state.places.map(countryOf).filter((c) => c && c !== "中国"))].sort();
-  const on = state.settings.territory !== false;
-  const sig = (on ? "1" : "0") + "|" + chinaNames.join(",") + "|" + foreign.join(",");
+  const sig = chinaNames.join(",") + "|" + foreign.join(",");
   if (sig === territorySig) return;
   territorySig = sig;
   if (territoryLayer) {
     map.removeLayer(territoryLayer);
     territoryLayer = null;
   }
-  if (!on) return;
   const cn = new Set(chinaNames);
   const fr = new Set(foreign);
   const feats = [];
@@ -698,13 +691,6 @@ function refreshTerritory() {
     }
   ).addTo(map);
   territoryLayer.bringToBack();
-}
-function toggleTerritory() {
-  state.settings.territory = state.settings.territory === false;
-  saveSettings();
-  if (el.territoryBtn) el.territoryBtn.classList.toggle("active", state.settings.territory !== false);
-  refreshTerritory();
-  toast(state.settings.territory !== false ? t("t_territory_on") : t("t_territory_off"), { emoji: "🗺️" });
 }
 
 /* ---------- master render ---------- */
@@ -1020,13 +1006,6 @@ function resetData() {
 function applyTheme() {
   document.body.dataset.theme = state.settings.theme;
 }
-function cycleTheme() {
-  const i = THEMES.indexOf(state.settings.theme);
-  state.settings.theme = THEMES[(i + 1) % THEMES.length];
-  saveSettings();
-  applyTheme();
-  toast(t("t_theme", { n: state.settings.theme }), { emoji: "🎨" });
-}
 
 /* ---------- events ---------- */
 function wire() {
@@ -1066,8 +1045,6 @@ function wire() {
   el.styleBtn.onclick = cycleMapStyle;
   $("#surpriseBtn").onclick = surprise;
   $("#locateBtn").onclick = () => fitTo(filtered());
-  if (el.territoryBtn) el.territoryBtn.onclick = toggleTerritory;
-  $("#themeToggle").onclick = cycleTheme;
   $("#langToggle").onclick = cycleLang;
 
   el.editor.addEventListener("submit", submitEditor);
@@ -1110,10 +1087,6 @@ function onKey(e) {
     surprise();
   } else if (e.key.toLowerCase() === "m") {
     cycleMapStyle();
-  } else if (e.key.toLowerCase() === "t") {
-    cycleTheme();
-  } else if (e.key.toLowerCase() === "b") {
-    toggleTerritory();
   } else if (e.key.toLowerCase() === "l") {
     cycleLang();
   }
@@ -1244,6 +1217,5 @@ function boot() {
   setupPanels();
   applyLang();
   render(true);
-  if (el.territoryBtn) el.territoryBtn.classList.toggle("active", state.settings.territory !== false);
 }
 boot();
