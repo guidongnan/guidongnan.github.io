@@ -592,6 +592,7 @@ body {
   flex-direction: column;
   gap: 10px;
   align-items: flex-start;
+  transition: left 0.5s var(--ease-out), top 0.5s var(--ease-out);
 }
 .tool {
   display: inline-flex;
@@ -1314,6 +1315,14 @@ body.is-busy .blob {
   transform: translateX(calc(-1 * (var(--rail-w) + 34px)));
   opacity: 0;
   pointer-events: none;
+}
+/* the rail slides out by transform, so the tools beside it must be moved explicitly;
+   top clears the reopen button, which occupies the same corner */
+@media (min-width: 901px) {
+  .rail.collapsed ~ .stage .map-tools {
+    left: 16px;
+    top: 64px;
+  }
 }
 .rail-reopen {
   position: absolute;
