@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <title>那个不肯去看的智能体 · Dongnan Gui</title>
+    <meta name="description" content="一个带记忆、检索和八个工具的自主智能体，输给了一个笨拙的固定循环，还多花了三倍的 token。真正救了它的不是更聪明，而是让「测量」变得躲不开。" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;450;500;600&family=JetBrains+Mono:wght@400;500&family=Noto+Serif+SC:wght@500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="blog.css" />
+  </head>
+  <body>
+    <header class="topbar" id="topbar">
+      <a class="home" href="../index.zh.html">Dongnan Gui</a>
+      <a href="../index.zh.html#writing">← 全部文章</a>
+      <a href="agent-would-not-look.html">English</a>
+    </header>
+
+    <nav class="toc" id="toc">
+      <div class="toc-h">目录</div>
+      <a href="#lost">智能体输了</a>
+      <a href="#zero">零次</a>
+      <a href="#budget">问题出在预算</a>
+      <a href="#forward">只增不减的学习</a>
+      <a href="#take">我从中学到什么</a>
+    </nav>
+
+    <article>
+      <div class="post-head">
+        <div class="kicker">笔记</div>
+        <h1>那个不肯去看的智能体</h1>
+        <div class="meta">
+          <span>2026 年 8 月</span><span class="dot"></span>
+          <span>约 7 分钟</span><span class="dot"></span>
+          <span>智能体 · 工具 · 评测</span>
+        </div>
+      </div>
+
+      <p class="lead">我做了一个智能体（agent）：有规划器、情节记忆（episodic memory）、一个建在失败模式库之上的检索工具、一份它自己维护的技能文档，外加八个工具。在一组条件对齐的任务上，它输给了一个固定的 <code>generate → verify → repair</code> 循环，还多花了大约三倍的 token。我为了让它变聪明所做的每一件事，都让它变得更差。最后真正奏效的那个办法笨得让人难为情，而我认为它是能推广的。</p>
+
+      <p>场景是这样的：智能体写一个小程序，求解器把它跑起来，再由一套检验装置（harness）测量这个程序是否真的产生了它所声称的那个事件。具体领域我会说得含糊一点，因为其中有些部分不该由我来公开；不过下面的内容并不依赖它。</p>
+
+      <h2 id="lost">智能体输了</h2>
+
+      <p>固定循环是所有人最先搭出来的东西：生成、验证、修复，重复 N 次，验证器居于正中，没有任何需要做的决策。智能体把这个结构反了过来：它先规划，然后每一轮选一个动作，观察结果，查阅自己的记忆和自己写的笔记，再自行决定什么时候算完成。验证器于是退化成八个工具里的一个。</p>
+
+      <p>在十二个条件对齐的任务上，固定循环解出了七个。智能体解出六个，而且为此多花了大约三倍的 token。这是个糟糕的结果，我对着它坐了好一阵子——因为在纸面上，智能体是严格占优的：循环能做的它都能做，它还多一样「能选」。</p>
+
+      <p>我的第一反应是它在瞎逛——把预算花在探索上，最后没有余地把场景收住。于是我加了一条提示：还剩三步时就收尾。结果它从六掉到了<b>三</b>。比循环差，比它自己差，比一次成型（one-shot）还差。</p>
+
+      <figure class="plain">
+        <svg viewBox="0 0 820 250" role="img" aria-label="在十二个条件对齐的任务上：固定循环解出 7 个；14 步预算的智能体解出 6 个，却多花了约三倍 token；加上提前收尾的提示后掉到 3 个；把预算提到 24 步则升到 8 个。">
+          <text x="0" y="14" font-family="Inter, system-ui, sans-serif" font-size="12" fill="#8b8b95">解出任务数 / 12</text>
+          <text x="560" y="14" font-family="Inter, system-ui, sans-serif" font-size="12" fill="#8b8b95">消耗 token</text>
+
+          <text x="0" y="52" font-family="Inter, system-ui, sans-serif" font-size="13" fill="#33333b">固定循环</text>
+          <rect x="150" y="38" width="245" height="18" rx="3" fill="#a8a8b4"/>
+          <text x="403" y="52" font-family="Inter, system-ui, sans-serif" font-size="12.5" fill="#8b8b95">7</text>
+          <rect x="560" y="42" width="26" height="10" rx="2" fill="#d8d8de"/>
+          <text x="596" y="52" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#8b8b95">1×</text>
+
+          <text x="0" y="98" font-family="Inter, system-ui, sans-serif" font-size="13" fill="#33333b">智能体，14 步</text>
+          <rect x="150" y="84" width="210" height="18" rx="3" fill="#c2412d" opacity="0.7"/>
+          <text x="368" y="98" font-family="Inter, system-ui, sans-serif" font-size="12.5" fill="#c2412d">6</text>
+          <rect x="560" y="88" width="82" height="10" rx="2" fill="#e8c4bc"/>
+          <text x="652" y="98" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#c2412d">~3×</text>
+
+          <text x="0" y="144" font-family="Inter, system-ui, sans-serif" font-size="13" fill="#33333b">+ 提前收尾提示</text>
+          <rect x="150" y="130" width="105" height="18" rx="3" fill="#c2412d" opacity="0.7"/>
+          <text x="263" y="144" font-family="Inter, system-ui, sans-serif" font-size="12.5" fill="#c2412d">3</text>
+          <rect x="560" y="134" width="72" height="10" rx="2" fill="#e8c4bc"/>
+          <text x="642" y="144" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#c2412d">~3×</text>
+
+          <text x="0" y="190" font-family="Inter, system-ui, sans-serif" font-size="13" font-weight="600" fill="#16161a">智能体，24 步</text>
+          <rect x="150" y="176" width="280" height="18" rx="3" fill="#4b41d8"/>
+          <text x="438" y="190" font-family="Inter, system-ui, sans-serif" font-size="12.5" font-weight="600" fill="#4b41d8">8</text>
+          <rect x="560" y="180" width="178" height="10" rx="2" fill="#bcb7f0"/>
+          <text x="748" y="190" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#4b41d8">~7×</text>
+
+          <line x1="0" y1="214" x2="820" y2="214" stroke="#ececef"/>
+          <text x="0" y="238" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#8b8b95">最后两行之间只变了一个变量：步数预算。同一个智能体、同一批工具、同一段提示词。</text>
+        </svg>
+        <figcaption>每一次试图让智能体「决策得更好」的努力都让它变差；而让它「多决策几次」却让它变好。</figcaption>
+      </figure>
+
+      <p>然后我只改了一个变量，别的什么都没动：把步数预算从十四提到二十四。它做到了八个，反超固定循环。同一个智能体、同一批工具、同一段提示词、同一批任务。</p>
+
+      <p>所以智能体的优势从来就不是我一直想象中的那种自主性——对「下一步该做什么」有更好的判断力。它的优势在于，自主性让它得以花掉<em>更多、也更有的放矢的迭代</em>。一旦我把迭代次数卡死，底下那一整套机制就只剩开销。</p>
+
+      <h2 id="zero">零次</h2>
+
+      <p>诊断的另一半，是我觉得最好笑、也最有用的部分。</p>
+
+      <p>在最初的设计里，检验装置——也就是那个测量「程序有没有做到它声称之事」的东西——是作为一个工具提供的。智能体想调用随时可以调用。它还有一个检索工具，可以查一个已诊断失败案例的库。这两样都明明白白地列在工具清单里，描述得清清楚楚，就摆在 <code>write_code</code> 和 <code>run_backend</code> 旁边。</p>
+
+      <p>在一整次运行中，智能体调用检索工具的次数是<b>零次</b>。它一遍又一遍地盲写代码，全靠猜哪里出了问题。</p>
+
+      <p>我想把「这为什么有意思」说得准确一点，因为「模型没用我给的工具」这句话本身只是个无聊的观察。有意思的地方在于，它揭示了信息必须被安置在哪里。智能体并不是不会用这套检验装置；当我手动调用、把结果摆到它面前时，它用得非常好。它只是从来不主动去看，因为「看一眼」要花掉一轮，而且不产生任何可见的进展；相比之下，多写点代码感觉像是在推进，而整个系统本来也在往这个方向推它。</p>
+
+      <p>修法是：别再「提供」，改成「塞给它」。现在，程序每成功运行一次，工具返回的结果本身<em>就是</em>那份完整的测量报告：程序达成了什么、违反了哪些约束、触发了哪些已知失败模式，以及检索出来的相关修复笔记。智能体不需要决定要不要看。看，就是「运行」这个动作的返回值。</p>
+
+      <figure class="plain">
+        <svg viewBox="0 0 820 210" role="img" aria-label="左：检验装置作为可选工具提供，智能体调用了零次，于是只能盲目重写。右：检验装置被塞进「运行程序」返回的观测里，因此每一次运行之后必定跟着一次测量。">
+          <defs>
+            <marker id="b1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#8b8b95"/></marker>
+          </defs>
+          <text x="0" y="14" font-family="Inter, system-ui, sans-serif" font-size="12.5" font-weight="600" fill="#c2412d">提供</text>
+          <rect x="0" y="30" width="120" height="42" rx="8" fill="#fff" stroke="#e2e2e7"/>
+          <text x="60" y="56" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="12.5" fill="#33333b">运行程序</text>
+          <line x1="126" y1="51" x2="150" y2="51" stroke="#8b8b95" marker-end="url(#b1)"/>
+          <rect x="156" y="30" width="120" height="42" rx="8" fill="#fff" stroke="#e2e2e7"/>
+          <text x="216" y="56" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="12.5" fill="#33333b">盲目重写</text>
+          <path d="M216 76 C 216 104, 60 104, 60 78" fill="none" stroke="#c2412d" stroke-dasharray="4 4"/>
+          <rect x="300" y="30" width="128" height="42" rx="8" fill="#faf7f7" stroke="#e8c4bc" stroke-dasharray="5 4"/>
+          <text x="364" y="49" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="12" fill="#c2412d">检验工具</text>
+          <text x="364" y="65" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#c2412d">被调用 0 次</text>
+          <text x="0" y="126" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#8b8b95">看一眼要花掉一轮，还看不出进展；写代码则感觉像在推进。</text>
+
+          <line x1="0" y1="146" x2="820" y2="146" stroke="#ececef"/>
+
+          <text x="0" y="176" font-family="Inter, system-ui, sans-serif" font-size="12.5" font-weight="600" fill="#4b41d8">塞给它</text>
+          <rect x="96" y="160" width="120" height="34" rx="8" fill="#fff" stroke="#e2e2e7"/>
+          <text x="156" y="181" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="12.5" fill="#33333b">运行程序</text>
+          <line x1="222" y1="177" x2="246" y2="177" stroke="#8b8b95" marker-end="url(#b1)"/>
+          <rect x="252" y="160" width="250" height="34" rx="8" fill="#eeecfb" stroke="#4b41d8"/>
+          <text x="377" y="181" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="12.5" fill="#4b41d8">测量结果随之一并返回</text>
+          <line x1="508" y1="177" x2="532" y2="177" stroke="#8b8b95" marker-end="url(#b1)"/>
+          <rect x="538" y="160" width="128" height="34" rx="8" fill="#fff" stroke="#e2e2e7"/>
+          <text x="602" y="181" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="12.5" fill="#33333b">有的放矢地修复</text>
+          <text x="686" y="181" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#8b8b95">无需任何决策</text>
+        </svg>
+        <figcaption>一个需要「记得去看」的智能体，等于没有检验装置。</figcaption>
+      </figure>
+
+      <p>我现在把这件事当成一条设计规则，而不是一次 bug 修复。如果某条信息是智能体正确完成任务所必需的，那它就不该待在工具清单里，它属于观测（observation）。可选地接触真相，在实践中等于接触不到真相。</p>
+
+      <h2 id="budget">问题出在预算，而这是个无趣的答案</h2>
+
+      <p>把这两个发现放在一起，故事就一点也不光鲜了。智能体的记忆、它的检索、它自己写下的笔记——没有一样是杠杆。真正的杠杆是：</p>
+
+      <ul>
+        <li><b>它能拿到多少轮修复机会。</b>遥遥领先的主导因素。</li>
+        <li><b>测量是不是躲不开。</b>排第二，而且正是它让多出来的轮次有价值可言——没有反馈的一轮，不过是又一份盲写的草稿。</li>
+      </ul>
+
+      <p>这和我在同一个项目里、在一个更大的基准上看到的现象是吻合的：有一条实验分支会独立抽出五份程序、留下自家验证器最中意的那一份，它只勉强胜过一次成型，却输给了朴素的修复循环。猜五次和「猜一次加一次测量」不是同一种资源，哪怕这五次更贵。</p>
+
+      <p>这里有一个版本的结论我倒希望自己是错的，所以让我把局限说清楚：我这组智能体对比只有十二个任务。十二个。在我试过的各种变体里方向都很稳定，机制也说得通，但我不会给它配一个置信区间；而且我还没把「主动塞检验结果」的那一版智能体在完整任务库上重跑一遍。</p>
+
+      <h2 id="forward">只增不减的学习</h2>
+
+      <p>这套机制里有一个零件我至今仍然相信，主要是因为它失败的方式。</p>
+
+      <p>智能体维护着一份属于它自己的经验文档。它一开始完全是空的——没有预置内容，也没有示例。每跑完一个 episode，智能体就把学到的东西提炼成一节，合并进去。合并操作受到约束：只能<b>新增或细化</b>，绝不能删除。而如果某次回复格式不对、解析出零条经验，文档就原封不动地留在原样。</p>
+
+      <p>真正要紧的正是最后这一条。它意味着一次糟糕的生成不可能抹掉已经积累的知识，最坏的情况也不过是浪费一轮。学习是单调的。我宁可要一份只增不减、略显臃肿的文档，也不要一份整洁却可能悄悄忘掉「我花了两天才诊断出来的那件事」的文档。</p>
+
+      <p>在这份文档上的检索是刻意做得很朴素的——词频，不用嵌入（embedding）。这里的匹配本来就是词面上的，因为症状和修复方案会共用一批具体名词；而且当智能体自己的文档在运行途中不断变长时，朴素索引能在毫秒级重建。稠密检索器（dense retriever）能给我的收益极小，代价却是失去「每次写入都重新索引」的能力。</p>
+
+      <p>对过往 episode 的记忆，排序时先看<em>机制</em>、再看尺度，理由是：倒塌就是倒塌，不管倒的是书架还是多米诺骨牌。成功的 episode 会拿到一点点偏好加分——加得足够小，小到「机制相同的一次失败」（它更可能切中要害）仍然排在「关系松散的一次成功」前面。</p>
+
+      <h2 id="take">我从中学到什么</h2>
+
+      <p>三件事，按我愿意为它们辩护的程度排序。</p>
+
+      <p><b>必需的信息应该放进观测，而不是工具清单。</b>我相当有信心这一条能推广到我这个场景之外。凡是智能体「必须查阅才能做对」的东西，它最终都不会去查。</p>
+
+      <p><b>在数别的任何东西之前，先数修复轮数。</b>当智能体表现不佳时，人的本能反应是去改进它的推理——更好的提示词、更好的规划、更好的记忆。可在我这个案例里，全部差距都来自迭代次数，我做的每一项推理改进跟它一比都微不足道。先把预算扫一遍；这件事很便宜，而且它能告诉你，你盯着的到底是不是那个对的变量。</p>
+
+      <p><b>自主性是一种花钱的方式，不是质量的来源。</b>智能体确实比固定循环强，但不是因为它选得明智，而是因为在循环该停下来的地方，它可以决定继续走下去。这是一个实实在在、值得拥有的优势。只不过，它并不是我一直告诉自己「我造出来的那个优势」。</p>
+
+      <div class="post-foot">
+        <a href="hold-the-model-fixed.html">← 相关：把模型固定住</a>
+        <a href="../index.zh.html#writing">全部文章 →</a>
+      </div>
+    </article>
+
+    <script>
+      const tb = document.getElementById("topbar");
+      addEventListener("scroll", () => tb.classList.toggle("scrolled", scrollY > 8), { passive: true });
+      const links = [...document.querySelectorAll(".toc a")];
+      const ids = links.map((a) => a.getAttribute("href").slice(1));
+      const spy = new IntersectionObserver((es) => {
+        es.forEach((e) => { if (e.isIntersecting) {
+          links.forEach((l) => l.classList.remove("active"));
+          const a = links.find((l) => l.getAttribute("href") === "#" + e.target.id);
+          if (a) a.classList.add("active");
+        }});
+      }, { rootMargin: "-70px 0px -70% 0px" });
+      ids.forEach((id) => { const el = document.getElementById(id); if (el) spy.observe(el); });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <title>相机拍不到的东西 · Dongnan Gui</title>
+    <meta name="description" content="一旦场景里的物体有了名字和轨迹，你就能画出任何渲染通道都产生不了的条件信号：某个物体去过哪里、哪个轮廓在前、东西在哪里接触。这是关于一族先验的笔记，也是一份我尚未证明之事的清单。" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;450;500;600&family=JetBrains+Mono:wght@400;500&family=Noto+Serif+SC:wght@500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="blog.css" />
+  </head>
+  <body>
+    <header class="topbar" id="topbar">
+      <a class="home" href="../index.zh.html">Dongnan Gui</a>
+      <a href="../index.zh.html#writing">← 全部文章</a>
+      <a href="camera-cannot-photograph.html">English</a>
+    </header>
+
+    <nav class="toc" id="toc">
+      <div class="toc-h">目录</div>
+      <a href="#free">形式是一个自由变量</a>
+      <a href="#spectrum">是一条谱系，不是一张清单</a>
+      <a href="#draw">相机看不见的四样东西</a>
+      <a href="#metric">递不出去的先验只是一个指标</a>
+      <a href="#next">接下来我想试什么</a>
+    </nav>
+
+    <article>
+      <div class="post-head">
+        <div class="kicker">现场笔记</div>
+        <h1>相机拍不到的东西</h1>
+        <div class="meta">
+          <span>2026 年 8 月</span><span class="dot"></span>
+          <span>约 6 分钟</span><span class="dot"></span>
+          <span>条件信号 · 可控生成 · 仿真</span>
+        </div>
+      </div>
+
+      <p class="lead">可控视频生成（controllable video generation）已经收敛到一份很短的条件信号（conditioning signal）清单上：深度、边缘、姿态、分割、光流。这份清单之所以短是有原因的，但原因并不是这几种最适合描述一个事件，而是这几种恰好是你能从手头现成素材里抽取出来的东西。如果你的场景改为来自仿真器，这个约束就消失了；于是你会发现，有一些很有用的表征之所以没人用，仅仅是因为没有任何相机能产生它们。</p>
+
+      <h2 id="free">形式是一个自由变量</h2>
+
+      <p>设定是这样的：一段程序描述一个物理场景，求解器把它跑出来，结果作为条件信号交给一个冻结的视频模型。深度是我最先用的那种形式，而且有一阵子我默认它就是<em>那个</em>形式——这条流水线就叫「深度流水线」。</p>
+
+      <p>让我改变想法的那个探针（probe）简单得有点难为情。取一个已烘焙好的场景。把提示词文件逐字节保持一致，随机种子一致，步数一致，画布一致。只改一件事：送进模型的是哪一种表征。先是深度，然后是表面法线，再然后是每个物体一色的平涂分割图。</p>
+
+      <p>三种模型都跟得住。并不是在每个方面都跟得一样好，但它确实能穿过每一种表征追踪同一个事件。这意味着条件信号的形式并不是流水线的固有属性；它是一个我可以逐镜头挑选的变量，而「怎么挑得好」是一个我此前根本没意识到自己有资格去问的设计问题。</p>
+
+      <h2 id="spectrum">是一条谱系，不是一张清单</h2>
+
+      <p>既然认定形式是自由的，下一个问题就是：这根轴到底是什么。我觉得好用的那根是<b>这个信号泄漏了多少外观信息</b>。</p>
+
+      <p>一端坐着深度：它只携带几何，别的什么都不带，所以模型必须自己发明每一个表面、每一种材质、每一道光。另一端——假设性地——是成片：没有任何东西留给你去发明，所谓「生成」就是复制。真实存在的东西都落在两端之间，而一种形式落在哪里，决定了你实际上是在要求模型做什么。</p>
+
+      <figure class="plain">
+        <svg viewBox="0 0 820 200" role="img" aria-label="一条从纯结构通往外观的谱系。深度、接触关系图、相机与事件这几种形式不泄漏任何外观；拖影和轨迹稍多一点；接触图、遮挡次序、光流和包围框再多一点；姿态、分割和坡度图更多；表面法线更多；示意图最靠外观一端。成片则会落在最远端。">
+          <line x1="20" y1="112" x2="800" y2="112" stroke="#e2e2e7" stroke-width="2"/>
+          <text x="20" y="34" font-family="Inter, system-ui, sans-serif" font-size="12.5" font-weight="600" fill="#16161a">纯结构</text>
+          <text x="20" y="52" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#8b8b95">模型要重建每一个像素</text>
+          <text x="800" y="34" text-anchor="end" font-family="Inter, system-ui, sans-serif" font-size="12.5" font-weight="600" fill="#8b8b95">外观</text>
+          <text x="800" y="52" text-anchor="end" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#8b8b95">没有什么留给你去发明</text>
+
+          <g font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#33333b">
+            <circle cx="20" cy="112" r="6" fill="#4b41d8"/>
+            <text x="20" y="140" text-anchor="middle" fill="#4b41d8" font-weight="600">深度</text>
+            <text x="20" y="156" text-anchor="middle" fill="#8b8b95">接触关系图</text>
+            <text x="20" y="170" text-anchor="middle" fill="#8b8b95">相机 · 事件</text>
+
+            <circle cx="120" cy="112" r="5" fill="#7a72e2"/>
+            <text x="120" y="92" text-anchor="middle">拖影</text>
+            <text x="120" y="78" text-anchor="middle" fill="#8b8b95">轨迹</text>
+
+            <circle cx="220" cy="112" r="5" fill="#7a72e2"/>
+            <text x="220" y="140" text-anchor="middle">接触图</text>
+            <text x="220" y="156" text-anchor="middle">遮挡次序</text>
+            <text x="220" y="170" text-anchor="middle" fill="#8b8b95">光流 · 包围框</text>
+
+            <circle cx="330" cy="112" r="5" fill="#9a94ea"/>
+            <text x="330" y="92" text-anchor="middle">姿态</text>
+
+            <circle cx="420" cy="112" r="5" fill="#9a94ea"/>
+            <text x="420" y="140" text-anchor="middle">分割</text>
+            <text x="420" y="156" text-anchor="middle" fill="#8b8b95">坡度图</text>
+
+            <circle cx="560" cy="112" r="5" fill="#bcb7f0"/>
+            <text x="560" y="92" text-anchor="middle">表面法线</text>
+
+            <circle cx="660" cy="112" r="5" fill="#d5d2f6"/>
+            <text x="660" y="140" text-anchor="middle">示意图</text>
+          </g>
+          <text x="20" y="192" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#8b8b95">二十多种形式共用一个接口。在这根轴上的位置只是被报告出来，而不是被强制的——它告诉你，你还在向模型索要画面的多少部分。</text>
+        </svg>
+        <figcaption>选择一种条件形式，就是在选择这张图里有多少要由模型负责。</figcaption>
+      </figure>
+
+      <p>事实证明，比起「我该加载哪个 ControlNet」，这是一种更有用的思考控制的方式。一个以材质为重点的镜头，想要的是靠近结构那一端的信号，好给模型留出余地。一个几何很微妙、材质却很平淡的镜头，想要的则是更往外观那边走的东西。</p>
+
+      <h2 id="draw">相机看不见的四样东西</h2>
+
+      <p>下面这部分之所以存在，完全是因为场景来自一段程序。我那二十多种形式里，大约有九种在已发表的可控生成文献中找不到对应物，原因很简单：<b>它们不是渲染通道。</b>没有哪个引擎设置叫「这个物体去过哪里」。你拍不到它。但只要你手上有每个物体在每一帧的世界坐标，以及看着它们的那台相机，你就可以直接把它画出来。</p>
+
+      <figure class="plain">
+        <svg viewBox="0 0 820 260" role="img" aria-label="四种自己发明的条件表征：拖影，显示每个物体去过哪里；遮挡次序，显示哪个轮廓在前，并丢弃度量距离；接触图，只显示物体在哪里接触；事件栅格图，每个物体一行、每一帧一列。">
+          <g>
+            <rect x="0" y="26" width="190" height="112" rx="10" fill="#fafafc" stroke="#e2e2e7"/>
+            <text x="12" y="18" font-family="Inter, system-ui, sans-serif" font-size="12.5" font-weight="600" fill="#4b41d8">拖影</text>
+            <path d="M22 118 C 60 108, 96 84, 150 54" fill="none" stroke="#4b41d8" stroke-width="7" opacity="0.15"/>
+            <path d="M60 108 C 92 96, 118 76, 150 54" fill="none" stroke="#4b41d8" stroke-width="7" opacity="0.32"/>
+            <path d="M110 82 C 128 72, 138 64, 150 54" fill="none" stroke="#4b41d8" stroke-width="7" opacity="0.6"/>
+            <circle cx="150" cy="54" r="8" fill="#4b41d8"/>
+            <text x="12" y="132" font-family="Inter, system-ui, sans-serif" font-size="11" fill="#8b8b95">单帧自带它自己的历史</text>
+          </g>
+          <g transform="translate(210,0)">
+            <rect x="0" y="26" width="190" height="112" rx="10" fill="#fafafc" stroke="#e2e2e7"/>
+            <text x="12" y="18" font-family="Inter, system-ui, sans-serif" font-size="12.5" font-weight="600" fill="#4b41d8">遮挡次序</text>
+            <rect x="24" y="52" width="76" height="66" rx="6" fill="#d5d2f6"/>
+            <rect x="58" y="66" width="76" height="60" rx="6" fill="#9a94ea"/>
+            <rect x="96" y="80" width="72" height="46" rx="6" fill="#4b41d8"/>
+            <text x="12" y="132" font-family="Inter, system-ui, sans-serif" font-size="11" fill="#8b8b95">只有次序——度量距离被丢弃</text>
+          </g>
+          <g transform="translate(420,0)">
+            <rect x="0" y="26" width="190" height="112" rx="10" fill="#fafafc" stroke="#e2e2e7"/>
+            <text x="12" y="18" font-family="Inter, system-ui, sans-serif" font-size="12.5" font-weight="600" fill="#4b41d8">接触图</text>
+            <circle cx="60" cy="72" r="24" fill="none" stroke="#d8d8de"/>
+            <circle cx="104" cy="86" r="28" fill="none" stroke="#d8d8de"/>
+            <circle cx="82" cy="112" r="22" fill="none" stroke="#d8d8de"/>
+            <ellipse cx="83" cy="78" rx="7" ry="4" fill="#4b41d8"/>
+            <ellipse cx="70" cy="96" rx="6" ry="4" fill="#4b41d8" opacity="0.7"/>
+            <ellipse cx="97" cy="106" rx="8" ry="4" fill="#4b41d8"/>
+            <text x="12" y="132" font-family="Inter, system-ui, sans-serif" font-size="11" fill="#8b8b95">只有在哪里接触、接触得多重</text>
+          </g>
+          <g transform="translate(630,0)">
+            <rect x="0" y="26" width="190" height="112" rx="10" fill="#fafafc" stroke="#e2e2e7"/>
+            <text x="12" y="18" font-family="Inter, system-ui, sans-serif" font-size="12.5" font-weight="600" fill="#4b41d8">事件栅格图</text>
+            <g fill="#4b41d8">
+              <rect x="20" y="48" width="8" height="8" rx="2" opacity="0.85"/>
+              <rect x="52" y="48" width="8" height="8" rx="2" opacity="0.5"/>
+              <rect x="88" y="66" width="8" height="8" rx="2" opacity="0.9"/>
+              <rect x="120" y="66" width="8" height="8" rx="2" opacity="0.4"/>
+              <rect x="60" y="84" width="8" height="8" rx="2" opacity="0.75"/>
+              <rect x="140" y="84" width="8" height="8" rx="2" opacity="0.9"/>
+              <rect x="104" y="102" width="8" height="8" rx="2" opacity="0.6"/>
+              <rect x="156" y="102" width="8" height="8" rx="2" opacity="0.85"/>
+            </g>
+            <line x1="16" y1="120" x2="176" y2="120" stroke="#e2e2e7"/>
+            <text x="12" y="132" font-family="Inter, system-ui, sans-serif" font-size="11" fill="#8b8b95">每个物体一行，每一帧一列</text>
+          </g>
+          <line x1="0" y1="170" x2="820" y2="170" stroke="#ececef"/>
+          <text x="0" y="194" font-family="Inter, system-ui, sans-serif" font-size="12" fill="#33333b">这些都不是渲染通道。它们是把烘焙好的物体经由烘焙好的相机反投影回去画出来的，</text>
+          <text x="0" y="214" font-family="Inter, system-ui, sans-serif" font-size="12" fill="#33333b">所以每一个亮起来的像素，都能追溯到某个特定物体在某一特定帧上。</text>
+          <text x="0" y="242" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#8b8b95">事件栅格图是我觉得最古怪的一个：它把时间变成了一根空间轴，于是单张图像里就装下了整个镜头的时间表。</text>
+        </svg>
+        <figcaption>四种表征之所以存在，只因为这个场景在成为图像之前，先是一段程序。</figcaption>
+      </figure>
+
+      <p>拖影是我最先会去拿的那一个。视频模型不擅长在一个长镜头里维持一条连贯的路径，而拖影把整条路径在单帧里一次性递过去，不必要求模型自己去积分。遮挡次序这种形式，则是我在深度跟我作对时会去拿的：有时候你想让模型知道板条箱在鼓的前面，却不想把它钉死在某个具体距离上——这时候把度量扔掉恰恰是重点，而不是损失。</p>
+
+      <h2 id="metric">递不出去的先验只是一个指标</h2>
+
+      <p>接下来是诚实的部分，也是我希望审稿人拿来卡我的那部分。</p>
+
+      <p>发明一种表征很便宜。验证它是否忠实地描述了场景只是稍微难一点——而且我确实全都验证了，对照的是从场景本身导出的约束。但是，<b>验证一种表征，和用它做条件，不是一回事。</b>一个我能测量、却喂不进模型的信号，是诊断工具，不是控制通道。</p>
+
+      <p>在这九种自创形式里，有四种已经被栅格化成了真正的条件视频。而真正走过视频模型的，是零种。所以我目前能为之辩护的主张是：「条件信号的形式是一个自由变量，已在三种形式上得到验证。」我<em>想</em>辩护的那个主张——它在二十多种形式上都是自由的——只是一份尚待证据的设计；与其让一个大数字去干它并未挣得的修辞活儿，我宁愿把话说得直白些。</p>
+
+      <p>还有一个相关的陷阱值得点名，因为我差点掉进去。造一个漂亮的表征、验证它、把它挂进画廊，然后完全没注意到模型压根没见过它——这实在太容易了。画廊看起来像是成果。它其实是一份待办清单。</p>
+
+      <h2 id="next">接下来我想试什么</h2>
+
+      <p>两个实验，按我会去跑的顺序排列。</p>
+
+      <p><b>把那四种已栅格化的形式推过模型。</b>同一次烘焙、同一段提示词、同一个种子——和深度／法线／分割那次探针完全相同的协议。有意思的结果不是「它能用」，而是：拖影是否恰好在那些路径很长、模型通常会跟丢的镜头上帮助最大。这是一个具体的、可证伪的预测，而不是一个笼统的期望。</p>
+
+      <p><b>在同一个镜头里混用多种形式。</b>这个接口没有任何地方要求只能有一个通道。接触图几乎不携带外观，却精确地指出那个有意思的瞬间在哪里；深度携带的是布局。把两者一起递过去，更接近我给人类交代任务的方式；而当前的模型能不能同时用上两个结构性信号，我完全不知道。正是这份不知道，构成了去跑它的理由。</p>
+
+      <p>更大的那个念头，也是我一直在这件事上较劲的原因：所有人都拿深度做条件，是因为深度恰好是你能从一段现成视频里抽出来的东西。这是一个关于数据集的事实，而不是一个关于「视频模型能用什么」的事实。一旦场景本身就是一段程序，问题就不再是「我能抽出什么」，而变成了「如果我什么都能说，我会<em>告诉</em>它什么」——而我认为这个领域在第二个问题上花的时间并不多。</p>
+
+      <div class="post-foot">
+        <a href="hold-the-model-fixed.html">← 相关：把模型固定住</a>
+        <a href="the-latent-cell.html">下一篇：潜空间的细胞 →</a>
+      </div>
+    </article>
+
+    <script>
+      const tb = document.getElementById("topbar");
+      addEventListener("scroll", () => tb.classList.toggle("scrolled", scrollY > 8), { passive: true });
+      const links = [...document.querySelectorAll(".toc a")];
+      const ids = links.map((a) => a.getAttribute("href").slice(1));
+      const spy = new IntersectionObserver((es) => {
+        es.forEach((e) => { if (e.isIntersecting) {
+          links.forEach((l) => l.classList.remove("active"));
+          const a = links.find((l) => l.getAttribute("href") === "#" + e.target.id);
+          if (a) a.classList.add("active");
+        }});
+      }, { rootMargin: "-70px 0px -70% 0px" });
+      ids.forEach((id) => { const el = document.getElementById(id); if (el) spy.observe(el); });
+    </script>
+  </body>
+</html>

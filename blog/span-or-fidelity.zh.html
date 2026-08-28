@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <title>跨度还是保真度，二选一 · Dongnan Gui</title>
+    <meta name="description" content="记忆预算一旦固定，逐字保留过去的一个切片就会逼你在「回溯得远」和「记得清楚」之间二选一。可学习的摘要拒绝这个选择——而两个消融实验表明，它的两半失效的方式完全不同。" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;450;500;600&family=JetBrains+Mono:wght@400;500&family=Noto+Serif+SC:wght@500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="blog.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" />
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"
+      onload="renderMathInElement(document.body,{delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}],throwOnError:false})"></script>
+  </head>
+  <body>
+    <header class="topbar" id="topbar">
+      <a class="home" href="../index.zh.html">Dongnan Gui</a>
+      <a href="../index.zh.html#writing">← 全部文章</a>
+      <a href="span-or-fidelity.html">English</a>
+    </header>
+
+    <nav class="toc" id="toc">
+      <div class="toc-h">目录</div>
+      <a href="#trap">固定预算里的陷阱</a>
+      <a href="#coarsen">变粗，而不是截断</a>
+      <a href="#two">两个消融，两种失效</a>
+      <a href="#knob">一个属性变成一个旋钮</a>
+      <a href="#honest">对一致性诚实一点</a>
+    </nav>
+
+    <article>
+      <div class="post-head">
+        <div class="kicker">笔记本</div>
+        <h1>跨度还是保真度，二选一</h1>
+        <div class="meta">
+          <span>2026 年 8 月</span><span class="dot"></span>
+          <span>约 7 分钟</span><span class="dot"></span>
+          <span>长视频 · 记忆 · 预算</span>
+        </div>
+      </div>
+
+      <p class="lead">这篇写的是一个两难：只要你给生成模型能携带多少过去设了上限，它就会出现。相关工作正在匿名评审中，所以这里没有名字，也没有数字——这比你以为的更不要紧，因为这个两难是结构性的，一次测量都不做也看得见。</p>
+
+      <h2 id="trap">固定预算里的陷阱</h2>
+
+      <p>生成长视频的模型必须以自己已经产出的内容为条件。全都留着不是一个选项——代价随长度增长，而视频帧的昂贵程度和文本 token 完全不在一个量级。于是你固定一个预算：过去只留这么多 token，不管片子跑多长，都不再多。</p>
+
+      <p>接下来所有人都会问：该留<em>多少</em>历史。这是个错误的问题，因为预算早就定死了。真正的问题是<b>你把它花在什么上</b>。而如果你把它花在逐字的 token 上——也就是真实过去的真实切片——你就被逼进了一个没有好答案的选择：</p>
+
+      <ul>
+        <li><b>留最近的若干帧。</b>保真度极好，却够不着任何远处。模型对最近一秒记得清清楚楚，完全不知道一分钟前这个房间是什么样。</li>
+        <li><b>留开头的一个切片，并把它钉死。</b>这下你够得着远处了，但这个切片永远不更新。模型生成的一切都会被拽回场景最初的样子——这也是为什么这么造出来的系统一旦漂移，就容易「啪」地弹回去。</li>
+      </ul>
+
+      <p>这么写下来，它显然是个假二分——但前提是你被允许存储过去本身之外的东西。出路是把同样的预算花在一份<b>可学习的摘要</b>上：当一帧的表征滑出最近窗口时，把它压缩后写进一个记忆库，而不是要么整份留着、要么直接扔掉。</p>
+
+      <h2 id="coarsen">变粗，而不是截断</h2>
+
+      <p>记忆库会满。满了之后你怎么做，就是整个设计。</p>
+
+      <p>朴素的答案是逐出：没地方了就丢最旧的。这不过是绕了几步的「最近窗口」策略——可达范围又一次被容量卡死，而且早期历史是彻底消失，而不是优雅地退化。</p>
+
+      <p>另一种做法是把记忆库做成层级式的，溢出时不逐出任何东西，而是<b>把最冗余的一对合并到更粗的一层</b>。旧历史不会消失，只是变得更模糊。整个跨度始终有表示，分辨率随年龄衰减，而总代价保持恒定。</p>
+
+      <figure class="plain">
+        <svg viewBox="0 0 820 250" role="img" aria-label="上：逐出式记忆库丢掉最旧的条目，早期历史因此消失。下：层级式记忆库在溢出时把最冗余的一对合并到更粗的一层，整个跨度因此始终有表示，只是分辨率随年龄衰减。">
+          <defs>
+            <marker id="d1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#8b8b95"/></marker>
+          </defs>
+          <text x="0" y="14" font-family="Inter, system-ui, sans-serif" font-size="12.5" font-weight="600" fill="#c2412d">满了就逐出</text>
+          <g>
+            <rect x="0" y="28" width="52" height="26" rx="4" fill="#f3d9d4" stroke="#e8c4bc" stroke-dasharray="4 3"/>
+            <text x="26" y="46" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="10.5" fill="#c2412d">没了</text>
+            <rect x="58" y="28" width="52" height="26" rx="4" fill="#f3d9d4" stroke="#e8c4bc" stroke-dasharray="4 3"/>
+            <text x="84" y="46" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="10.5" fill="#c2412d">没了</text>
+            <rect x="116" y="28" width="52" height="26" rx="4" fill="#a8a8b4"/>
+            <rect x="174" y="28" width="52" height="26" rx="4" fill="#a8a8b4"/>
+            <rect x="232" y="28" width="52" height="26" rx="4" fill="#a8a8b4"/>
+            <rect x="290" y="28" width="52" height="26" rx="4" fill="#a8a8b4"/>
+            <text x="360" y="46" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#c2412d">可达范围又被容量卡死——开头干脆就不在了</text>
+          </g>
+
+          <line x1="0" y1="82" x2="820" y2="82" stroke="#ececef"/>
+
+          <text x="0" y="110" font-family="Inter, system-ui, sans-serif" font-size="12.5" font-weight="600" fill="#4b41d8">满了就变粗</text>
+          <text x="0" y="140" font-family="Inter, system-ui, sans-serif" font-size="11" fill="#8b8b95">最旧</text>
+          <text x="356" y="140" font-family="Inter, system-ui, sans-serif" font-size="11" fill="#8b8b95">最新</text>
+          <g>
+            <rect x="0" y="148" width="112" height="26" rx="4" fill="#4b41d8" opacity="0.28"/>
+            <text x="56" y="166" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="10.5" fill="#33333b">粗</text>
+            <rect x="118" y="148" width="112" height="26" rx="4" fill="#4b41d8" opacity="0.28"/>
+            <rect x="236" y="148" width="52" height="26" rx="4" fill="#4b41d8" opacity="0.55"/>
+            <rect x="294" y="148" width="52" height="26" rx="4" fill="#4b41d8" opacity="0.55"/>
+            <rect x="352" y="148" width="26" height="26" rx="4" fill="#4b41d8"/>
+            <rect x="382" y="148" width="26" height="26" rx="4" fill="#4b41d8"/>
+          </g>
+          <path d="M236 182 C 236 200, 130 200, 118 180" fill="none" stroke="#4b41d8" stroke-dasharray="4 4" marker-end="url(#d1)"/>
+          <text x="150" y="216" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#4b41d8">溢出时，最冗余的一对合并到更粗的一层</text>
+          <text x="440" y="160" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#33333b">没有任何东西彻底缺席，</text>
+          <text x="440" y="178" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#33333b">也没有任何东西被冻结</text>
+          <text x="440" y="200" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#8b8b95">总代价不随片长增长</text>
+          <line x1="0" y1="232" x2="820" y2="232" stroke="#ececef"/>
+          <text x="0" y="248" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#8b8b95">两行的预算相同。区别只在于「满了」意味着遗忘，还是意味着模糊。</text>
+        </svg>
+        <figcaption>逐出让你的可达范围被容量限住；变粗改为限住你的分辨率，而分辨率是更值得花掉的东西。</figcaption>
+      </figure>
+
+      <p>值得记住的后果是：在逐字策略下，给系统更大的预算，过了某个点就买不到更远的可达范围了——它会在模型训练时所能关注的时域附近饱和，多出来的预算全花在它本来就有的细节上。而在变粗式摘要下，额外预算会持续转化成跨度。同一个旋钮，汇率完全不同，因为两种策略买的根本是不同的商品。</p>
+
+      <h2 id="two">两个消融，两种完全不同的失效</h2>
+
+      <p>这个设计有两个很容易被混为一谈的部分：决定记忆库如何衰老的<em>层级结构</em>，以及决定一个压缩条目里究竟装了什么的<em>可学习读出</em>。在分别把它们拿掉之前，我一直以为这只是同一个想法的两个侧面。</p>
+
+      <p>把层级结构换成一个总容量相同的扁平桶，系统就只能截断而不能变粗。覆盖率随之崩塌——仍然有表示的不同时刻数量急剧下降——依赖远处过去的一切质量也跟着垮掉。</p>
+
+      <p>把可学习的压缩器换成朴素平均，发生的事情正好相反。<em>跨度</em>完全没问题，记忆库依然一路够回最开头。但运动细节被抹平了，生成的视频明显变得不那么动——发生过的事情的平均，是对它的一份静止描述。</p>
+
+      <figure class="plain">
+        <svg viewBox="0 0 820 200" role="img" aria-label="两个消融。去掉层级结构会损失覆盖率：系统只能截断，远处的过去随之消失。去掉可学习读出则保住了覆盖率，却把运动抹平了。">
+          <rect x="0" y="20" width="392" height="130" rx="10" fill="#fafafc" stroke="#e2e2e7"/>
+          <text x="20" y="46" font-family="Inter, system-ui, sans-serif" font-size="12.5" font-weight="600" fill="#16161a">去掉层级结构</text>
+          <text x="20" y="66" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#8b8b95">一个扁平桶，容量相同</text>
+          <text x="20" y="96" font-family="Inter, system-ui, sans-serif" font-size="12" fill="#c2412d">它只能截断，不能变粗</text>
+          <text x="20" y="118" font-family="Inter, system-ui, sans-serif" font-size="12" fill="#33333b">→ 覆盖率崩塌</text>
+          <text x="20" y="138" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#8b8b95">远处的过去是没了，而不是变模糊</text>
+
+          <rect x="428" y="20" width="392" height="130" rx="10" fill="#fafafc" stroke="#e2e2e7"/>
+          <text x="448" y="46" font-family="Inter, system-ui, sans-serif" font-size="12.5" font-weight="600" fill="#16161a">去掉可学习读出</text>
+          <text x="448" y="66" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#8b8b95">改用朴素平均</text>
+          <text x="448" y="96" font-family="Inter, system-ui, sans-serif" font-size="12" fill="#c2412d">跨度保住了，细节没保住</text>
+          <text x="448" y="118" font-family="Inter, system-ui, sans-serif" font-size="12" fill="#33333b">→ 运动被抹平</text>
+          <text x="448" y="138" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#8b8b95">一个事件的平均，是对它的静止描述</text>
+
+          <text x="0" y="180" font-family="Inter, system-ui, sans-serif" font-size="12" fill="#33333b">层级结构决定你把一样东西留<tspan font-weight="600" fill="#4b41d8">多久</tspan>，可学习读出决定留得<tspan font-weight="600" fill="#4b41d8">多细</tspan>。两者互不可替代。</text>
+        </svg>
+        <figcaption>最有用的消融，是那些朝不同方向失效的消融。如果两次退化的方式一样，我就完全学不到哪一部分在做什么。</figcaption>
+      </figure>
+
+      <p>我喜欢这一对，一是因为它把关注点分得干净，二是因为它是「该去跑那些你预期会很无聊的消融」的一个好论据。要是两次移除都只给出「稍微差一点」，我大概会得出这两部分冗余的结论，然后把错的那一个简化掉。</p>
+
+      <h2 id="knob">一个属性变成一个旋钮</h2>
+
+      <p>我没预料到的那个结果，关乎的是控制，而不是质量。</p>
+
+      <p>把这些系统画在<em>场景保持得有多一致</em>与<em>究竟有多少东西在动</em>所构成的平面上。每个固定策略的基线都落在单独一个点上，而这个点由它的机制钉死：一个几乎静止的系统并不是选择了静止，它只是别的做不了。你没法要求它多动一点，因为「动」根本不是它拥有的参数。</p>
+
+      <p>而改变预算的花法，在那个平面上划出的是一条<em>曲线</em>，不是一个点。这意味着动态性不再是架构继承来的属性，而变成了你可以设定的东西——同一个系统上的不同工作点，按镜头逐个挑选。</p>
+
+      <p>我认为这比任何单一分数都更有意思，而且这类主张最容易淹没在一张头条数字表里。「我们更好」会招来一场关于指标的争论；「这一维过去是固定的，现在它是个旋钮」则是另一种性质的陈述。</p>
+
+      <h2 id="honest">对一致性诚实一点</h2>
+
+      <p>有一件事我想白纸黑字写下来，因为它是这整个方向上最锋利的那道边。</p>
+
+      <p>报告连贯性的标准做法，是某种相邻帧之间的平均相似度。而这个数字的最大值——精确地、全局地——由一段永不变化的视频取得。于是一个悄悄停下不动的系统会拿到极好的一致性分数，一个真的推着相机穿过真实场景的系统反而分数更差，然后表格告诉你前者更好。</p>
+
+      <p>所以当我报告一致性时，真正要紧的比较对象不是那一列里最好的数字，而是一次什么都没做的 rollout。如果一段静止的片子能赢过我，那这个数字就不是关于我系统的证据，而是关于这个指标的证据。这个失效模式我在<a href="metrics-that-lie.html#one">别处写得更长</a>，也正是因为它，我宁可把九个时间戳并排摆出来，也不愿只给一个平均分。</p>
+
+      <p>把现在还不能说的东西全剥掉之后，我愿意为之辩护的主张是：<b>在预算固定的前提下，买整个跨度的摘要，而不是它的一个切片</b>——并且要去核对，你在一致性上得到的那点收益，是不是仅仅靠静止不动买来的。</p>
+
+      <div class="post-foot">
+        <a href="hold-the-model-fixed.html">← 相关：把模型冻住</a>
+        <a href="metrics-that-lie.html">下一篇：我的指标骗了我四次 →</a>
+      </div>
+    </article>
+
+    <script>
+      const tb = document.getElementById("topbar");
+      addEventListener("scroll", () => tb.classList.toggle("scrolled", scrollY > 8), { passive: true });
+      const links = [...document.querySelectorAll(".toc a")];
+      const ids = links.map((a) => a.getAttribute("href").slice(1));
+      const spy = new IntersectionObserver((es) => {
+        es.forEach((e) => { if (e.isIntersecting) {
+          links.forEach((l) => l.classList.remove("active"));
+          const a = links.find((l) => l.getAttribute("href") === "#" + e.target.id);
+          if (a) a.classList.add("active");
+        }});
+      }, { rootMargin: "-70px 0px -70% 0px" });
+      ids.forEach((id) => { const el = document.getElementById(id); if (el) spy.observe(el); });
+    </script>
+  </body>
+</html>

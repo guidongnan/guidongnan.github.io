@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <title>我们先教会了照片动起来，才想起问它们愿不愿意 · Dongnan Gui</title>
+    <meta name="description" content="图生视频更安静的那一面：与其事后去追赶伪造品，不如保护画面里的那个人。" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;450;500;600&family=JetBrains+Mono:wght@400;500&family=Noto+Serif+SC:wght@500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="blog.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" />
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"
+      onload="renderMathInElement(document.body,{delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}],throwOnError:false})"></script>
+  </head>
+  <body>
+    <header class="topbar" id="topbar">
+      <a class="home" href="../index.zh.html">Dongnan Gui</a>
+      <a href="../index.zh.html#writing">← 全部文章</a>
+      <a href="i2v-consent.html">English</a>
+    </header>
+
+    <nav class="toc" id="toc">
+      <div class="toc-h">目录</div>
+      <a href="#capability">一种让人睡不着的能力</a>
+      <a href="#reactive">输出端的安全是被动的</a>
+      <a href="#input">保护输入</a>
+      <a href="#modules">扰动是怎么构造的</a>
+      <a href="#hard">为什么难</a>
+      <a href="#asym">我在意的那种不对称</a>
+    </nav>
+
+    <article>
+      <div class="post-head">
+        <div class="kicker">视频生成笔记</div>
+        <h1>我们先教会了照片动起来，才想起问它们愿不愿意</h1>
+        <div class="meta">
+          <span>2026 年 8 月</span><span class="dot"></span>
+          <span>约 8 分钟</span><span class="dot"></span>
+          <span>图生视频 · 安全 · 对抗性保护</span>
+        </div>
+      </div>
+
+      <p class="lead">图生视频（image-to-video）属于那种能力：头一个星期你觉得它像魔法，之后它开始让你睡不着觉。现在任何一张静态照片都可以被驱动起来——包括某个从未同意过要动的真人的照片。</p>
+
+      <h2 id="capability">一种让人睡不着的能力</h2>
+      <p>技术上的进步是真的了不起；我自己就在做这个方向，这话是真心的。但「让画面动起来」拉低了一道原本无意间保护着人们的门槛。照片曾经是一个固定的东西。而现在，一张肖像——从个人主页、新闻报道或者一张合影里扒下来的——就足以充当原料，让一个人动起来，说出或做出他从未说过、做过的事。「存在一张你的照片」和「存在一段你的视频」之间原本隔着很宽的距离。如今这段距离只剩一次前向传播。</p>
+
+      <h2 id="reactive">输出端的安全是被动的</h2>
+      <p>在生成式媒体领域，几乎所有关于安全的讨论都围绕输出展开：给生成的视频打水印；训练一个检测器把它标出来；维护一份伪造内容的登记库。这些工作是有意义的，我也很高兴有人在做。但请注意时序：其中每一项动作都发生在视频已经存在<em>之后</em>。等到你开始检测一段片子时，它早就被制作、被转发、被看过了。水印可以被裁掉，也可以在重新编码中消失；而检测器追的是一个随每一个新模型漂移的分布。这是一种永远落后于它所防御之物一步的防御，因为它只有第二手可走。</p>
+      <div class="callout"><b>换一种提法。</b>不要问「一段伪造视频做出来之后，我们怎么把它认出来」，而要问「我们怎么做出一张一开始就难以被驱动起来的照片」。把防御挪到输入端，让它得以先手。</div>
+
+      <h2 id="input">保护输入</h2>
+      <p>这个想法借自对抗样本（adversarial example），但把它的意图反了过来。对抗攻击是加上一个人眼不可察的扰动（perturbation）好让模型失效；而在这里，失效本身正是<em>我们想要的功能</em>。你计算出一个小扰动 $\delta$，在图像被分享出去之前就加上去，它会悄悄地把图生视频模型搞坏，同时让这张照片在人看来完全正常：</p>
+      $$ \delta^\star \;=\; \arg\max_{\lVert \delta \rVert_\infty \le \epsilon} \; \mathcal{L}\big(f(x+\delta)\big), \qquad x+\delta \approx x \;\text{to a human.} $$
+      <p>这里 $f$ 是图生视频模型，$\mathcal{L}$ 会奖励它产出无法使用的东西——一段凝固不动的、前后不连贯的、或者一眼就看得出坏掉的片子——而 $\epsilon$ 预算则保证 $\delta$ 不被人眼察觉。这个人分享出去的是 $x+\delta$，而不是 $x$。在任何人眼里它都是同一张照片；在生成式视频模型眼里，它是一片流沙。这层保护是<em>随图像一起走</em>的，所以无论图像最终流落到哪里它都有效，事后也不需要任何人去检测什么。</p>
+
+      <h2 id="modules">扰动是怎么构造的</h2>
+      <p>「把模型搞坏」这个目标太粗了。一张静态图像给了图生视频系统好几处彼此独立的抓手，而一套保护的强度，取决于它遗漏掉的那条通道。比较有效的做法是按模型自身计算的划分方式来拆分攻击——拆成<b>空间</b>项、<b>时间</b>项和<b>扩散</b>项。</p>
+      <ul>
+        <li><b>空间项。</b>破坏模型从静态图像中读出的逐帧外观，让它试图驱动的内容本身就已经不可靠。</li>
+        <li><b>时间项。</b>直接攻击运动本身——把模型推向不连贯甚至凝固的动态，好让哪怕渲染得还算像样的一帧帧画面，也拼不成一段像样的运动。</li>
+        <li><b>扩散项。</b>利用采样器。由于这类模型要经过很多步去噪，一个<em>沿着</em>轨迹被逐步放大的扰动，其破坏力远大于只在输入端衡量的扰动；因此目标函数是穿过扩散过程来计算的，而不是绕过它。</li>
+      </ul>
+      <p>完整的目标函数是这三项的加权和，并且仍然受同一个不可察觉性预算的约束：</p>
+      $$ \delta^\star = \arg\max_{\lVert\delta\rVert_\infty \le \epsilon} \; \lambda_s\,\mathcal{L}_{\text{spatial}} + \lambda_t\,\mathcal{L}_{\text{temporal}} + \lambda_d\,\mathcal{L}_{\text{diffusion}}. $$
+      <p>这样拆分并不是为了整齐而整齐。每一项都关上了另外两项留着的一扇门；而一套只关上其中一扇的防御，攻击者绕着走就是了。</p>
+
+      <h2 id="hard">为什么难</h2>
+      <p>说得这么干净，听上去像是已经解决了。并没有，而这些原因值得诚实地摆出来。</p>
+      <ul>
+        <li><b>迁移性。</b>你几乎永远拿不到攻击者将会使用的那个模型的白盒访问权限。一个针对某一个图生视频系统调出来的扰动，必须在它从未见过的其他系统上依然存活——不同的架构，不同的隐空间。跨模型迁移才是这场比赛的全部，而它很脆弱。</li>
+        <li><b>不可察觉性预算。</b>把 $\epsilon$ 调大，保护变得稳健，但照片开始看着不对劲；调小，照片保持干净，保护却很容易被洗掉。这个取舍是真实的，而且不留情面。</li>
+        <li><b>净化（purification）。</b>一次轻微的模糊、一次重新压缩、一次先缩小再放大，都可能在图像抵达生成器之前就把一个脆弱的扰动剥掉。保护必须挺过「被发到网上」所附带的种种寻常折腾。</li>
+        <li><b>军备竞赛。</b>任何固定不变的防御，都在招引一个专门被训练来无视它的模型。这不是一个解决一次就完事的问题，而是一个需要持续守住的阵地。</li>
+      </ul>
+
+      <h2 id="asym">我在意的那种不对称</h2>
+      <p>同时抱着这样两个项目，感觉是挺奇怪的。这一季你教图像动起来，下一季你教它们拒绝。但其中有一种不对称，让第二个项目显得与其说优雅，不如说紧迫。建造生成式视频系统的那些人，资源充足、组织有序。而那些脸最终落进这些系统里的人——大多数——并不是。他们没有选择加入，也不会有人来征询他们的意见；而到今天为止，他们那一边基本上什么都没有。</p>
+      <p>输入端保护并不能凭它自己解决这件事，我也不想把一个扰动吹成它并不是的那种盾牌。但比起什么都没有，我更希望照片里的那个人手上<em>有点什么</em>；我也更希望防御方能有那么一次先走一步。这个理由已经足够让我去做它了。</p>
+
+      <hr />
+      <div class="refs">
+        <h3>参考文献</h3>
+        <ol>
+          <li id="r1">Salman, H., Khaddaj, A., Leclerc, G., Ilyas, A., &amp; Madry, A. (2023). <a href="https://scholar.google.com/scholar?q=Raising+the+Cost+of+Malicious+AI-Powered+Image+Editing+PhotoGuard" target="_blank" rel="noopener">Raising the Cost of Malicious AI-Powered Image Editing</a>（PhotoGuard）。ICML。</li>
+          <li id="r2">Shan, S., Cryan, J., Wenger, E., Zheng, H., Hanocka, R., &amp; Zhao, B. Y. (2023). <a href="https://scholar.google.com/scholar?q=Glaze+Protecting+Artists+from+Style+Mimicry+by+Text-to-Image+Models" target="_blank" rel="noopener">Glaze: Protecting Artists from Style Mimicry by Text-to-Image Models</a>。USENIX Security。</li>
+          <li id="r3">Gui, D., Guo, X., Zhou, W., &amp; Lu, Y. (2025). <a href="https://openaccess.thecvf.com/content/CVPR2025/html/Gui_I2VGuard_Safeguarding_Images_against_Misuse_in_Diffusion-based_Image-to-Video_Models_CVPR_2025_paper.html" target="_blank" rel="noopener">I2VGuard: Safeguarding Images against Misuse in Diffusion-based Image-to-Video Models</a>。CVPR。</li>
+        </ol>
+      </div>
+
+      <div class="post-foot">
+        <a href="single-image-world.html">← 一张图像已经是一个世界</a>
+        <a href="../index.zh.html#writing">全部文章 →</a>
+      </div>
+    </article>
+
+    <script>
+      const tb = document.getElementById("topbar");
+      addEventListener("scroll", () => tb.classList.toggle("scrolled", scrollY > 8), { passive: true });
+      const links = [...document.querySelectorAll(".toc a")];
+      const spy = new IntersectionObserver((es) => {
+        es.forEach((e) => { if (e.isIntersecting) {
+          links.forEach((l) => l.classList.remove("active"));
+          const a = links.find((l) => l.getAttribute("href") === "#" + e.target.id);
+          if (a) a.classList.add("active");
+        }});
+      }, { rootMargin: "-70px 0px -70% 0px" });
+      links.map((a) => a.getAttribute("href").slice(1)).forEach((id) => { const el = document.getElementById(id); if (el) spy.observe(el); });
+    </script>
+  </body>
+</html>

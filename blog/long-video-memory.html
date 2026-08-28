@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <title>Memory, not context, is the bottleneck in long video · Dongnan Gui</title>
+    <meta name="description" content="Why extending the context window is the wrong lever for long video generation, and what a learnable compressed memory buys you instead." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;450;500;600&family=JetBrains+Mono:wght@400;500&family=Noto+Serif+SC:wght@500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="blog.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" />
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"
+      onload="renderMathInElement(document.body,{delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}],throwOnError:false})"></script>
+  </head>
+  <body>
+    <header class="topbar" id="topbar">
+      <a class="home" href="../index.html">Dongnan Gui</a>
+      <a href="../index.html#writing">← All writing</a>
+      <a href="long-video-memory.zh.html">中文</a>
+    </header>
+
+    <nav class="toc" id="toc">
+      <div class="toc-h">Contents</div>
+      <a href="#framing">The framing problem</a>
+      <a href="#cache">What the model stores</a>
+      <a href="#redundant">Why most of it is waste</a>
+      <a href="#three">Three ways to bound the past</a>
+      <a href="#memory">A learnable memory</a>
+      <a href="#forget">Learning what to forget</a>
+      <a href="#where">Where this goes</a>
+    </nav>
+
+    <article>
+      <div class="post-head">
+        <div class="kicker">Notes on video generation</div>
+        <h1>Memory, not context, is the bottleneck in long video</h1>
+        <div class="meta">
+          <span>August 2026</span><span class="dot"></span>
+          <span>~11 min</span><span class="dot"></span>
+          <span>autoregressive video · long context · memory</span>
+        </div>
+      </div>
+
+      <p class="lead">Every few months someone extends the context window and calls it long-video generation. I've stopped believing that framing. The model can already look far enough back; the trouble is that almost everything back there is repetition, and we are paying to store and re-read it anyway.</p>
+
+      <p>This is a note about why <em>memory</em> — a small, learned, persistent state — is a better lever than <em>context</em> for generating long, coherent video, and about the one part of it that is genuinely hard.</p>
+
+      <h2 id="framing">The framing problem</h2>
+      <p>An autoregressive video model factorizes a clip the obvious way, one frame after another:</p>
+      $$ p_\theta(x_{1:T}) = \prod_{t=1}^{T} p_\theta\!\left(x_t \mid x_{&lt;t}\right). $$
+      <p>The whole game is the conditioning term $x_{&lt;t}$: how the model summarizes everything it has already generated when it draws the next frame. In a transformer, "summarize" means self-attention over the tokens of the past, and the past is kept around as a <b>key–value cache</b>. So the framing that dominates papers — <em>make the context longer</em> — is really a claim about that cache: keep more of it, attend over more of it.</p>
+      <p>I think that claim quietly conflates two different things: how far back the model can <em>reach</em>, and how much it needs to <em>remember</em>. Those are not the same quantity, and video makes the gap enormous.</p>
+
+      <h2 id="cache">What an autoregressive video model actually stores</h2>
+      <p>Take a latent-space transformer. Each frame is encoded to $P$ tokens (a $16\times16$ latent grid is already $P=256$), the model has $L$ layers and hidden size $d$. After $T$ frames the KV cache holds</p>
+      $$ \text{cache} \;=\; 2 \cdot L \cdot T \cdot P \cdot d \quad\text{scalars,} $$
+      <p>which grows <b>linearly in $T$</b>, with a constant ($2LPd$) that is large precisely because $P$ is large for video. Worse, if you attend over all of it, the per-step attention cost is</p>
+      $$ \mathcal{O}\!\left((T P)^2 \, d\right), $$
+      <p>quadratic in the running length $TP$. A minute of video at any reasonable token rate puts you well outside the budget where full attention is affordable, in both memory and time. This is the wall everyone hits, and "longer context" walks straight into it.</p>
+
+      <h2 id="redundant">Why most of the cache is waste</h2>
+      <p>Here is the observation the linear-growth story leaves out: a hallway does not change while you walk down it. The wall texture, the light from the window, the fact that there is a door on the left — each of these is worth recording <em>once</em>. The hundred frames that happen to depict them are not worth recording a hundred times, but a naive cache does exactly that.</p>
+      <blockquote><p>The cache grows with time; the <em>information</em> grows with change. Video is mostly not-change.</p></blockquote>
+      <p>So the redundancy is not a rounding error, it is the dominant term. Between two nearby frames, the parts that persist — geometry, identity, scene layout — vastly outweigh the parts that move. If you could store "what persists" once and let the pixel-level churn wash out, the thing you actually need to carry forward would be small and roughly constant in size, not linear in $T$.</p>
+
+      <h2 id="three">Three ways to bound the past</h2>
+      <p>There are, broadly, three moves for keeping the conditioning tractable, and it is worth being honest about what each one costs.</p>
+      <ul>
+        <li><b>Sliding window.</b> Keep the last $W$ frames, drop the rest. Bounded and simple, and it is what most streaming models do. But it forgets by construction: walk back to a room you saw two hundred frames ago and the model has no idea it has been there, so it redecorates. Long-range consistency is exactly what a fixed window throws away.</li>
+        <li><b>Full attention with tricks.</b> Keep everything, make attention cheaper — sparsity, linear attention, state-space models. This pushes the wall back and, in the SSM case, replaces the cache with a fixed-size recurrent state. It helps, but a generic long-sequence trick does not know that video redundancy is <em>structured</em> (static background vs. moving foreground); it compresses uniformly.</li>
+        <li><b>Learned compression.</b> Map the growing history into a fixed-size memory and attend over that. This is the Transformer-XL and Compressive-Transformer lineage <a href="#r1">[1]</a><a href="#r2">[2]</a>, imported into video. The bet is that a model can learn <em>what</em> to keep, so the memory stays small without being blind.</li>
+      </ul>
+      <p>I care about the third one, because it is the only one whose failure mode is "compressed the wrong thing" rather than "structurally cannot remember."</p>
+
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>Approach</th><th>Per-step cost</th><th>State size</th><th>Long-range</th></tr></thead>
+        <tbody>
+          <tr><td>Full attention</td><td>$\mathcal{O}(TP\,d)$, grows with $T$</td><td>$\mathcal{O}(TP)$, grows</td><td>Exact, but unaffordable</td></tr>
+          <tr><td>Sliding window ($W$)</td><td>$\mathcal{O}(WP\,d)$</td><td>$\mathcal{O}(WP)$</td><td>Lost beyond $W$ frames</td></tr>
+          <tr><td>State-space / SSM</td><td>$\mathcal{O}(1)$ in $T$</td><td>fixed, $\mathcal{O}(d_{\text{state}})$</td><td>Compressed, but uniform</td></tr>
+          <tr><td>Compressed memory</td><td>$\mathcal{O}\big((m+WP)\,d\big)$</td><td>fixed, $\mathcal{O}(m)$</td><td>Learned, selective</td></tr>
+        </tbody>
+      </table></div>
+      <p>The bottom two rows both give you a state that does not grow with clip length. The difference is the last column. A state-space model compresses the past with a fixed recurrence that treats every token alike; a learned memory is allowed to spend its slots where they matter. For video, where the content worth keeping is a small and slowly-changing fraction of the stream, "selective" is the whole point.</p>
+
+      <h2 id="memory">A learnable compressed memory</h2>
+      <p>Concretely: carry a fixed-size memory bank $M \in \mathbb{R}^{m \times d}$ with $m \ll TP$. When the model draws frame $t$, it does not attend over the entire past; it attends over the memory plus a short local window:</p>
+      $$ h_t = \text{Attn}\!\left(Q_t,\; [\,M_{t-1};\,K^{\text{loc}}_t\,],\; [\,M_{t-1};\,V^{\text{loc}}_t\,]\right). $$
+      <p>After the frame is produced, the memory is <b>updated</b> from the new frame's representation $H_t$ through a learned map:</p>
+      $$ M_t = g_\phi\!\left(M_{t-1},\, H_t\right). $$
+      <p>Everything interesting lives in $g_\phi$. It is a read–write controller: decide which slots to overwrite, which to leave alone, how to fold a new observation into an existing summary. You can implement it as cross-attention from memory slots to the new tokens (slots "pull" what they care about), with a learned gate deciding how much each slot moves. The local window keeps high-frequency motion crisp; the memory keeps the slow-moving scene state alive across arbitrary gaps.</p>
+
+      <h3>The write is a gate, not an append</h3>
+      <p>The naive move is to append every new frame's summary to memory — but then memory grows again and we are back where we started. The update has to be a bounded overwrite. Write it as a per-slot gate: each slot $i$ decides how far to move toward what it just saw,</p>
+      $$ M_t^{(i)} = \big(1-\alpha_t^{(i)}\big)\,M_{t-1}^{(i)} \;+\; \alpha_t^{(i)}\,\tilde{H}_t^{(i)}, \qquad \alpha_t^{(i)} = \sigma\!\big(w^\top[\,M_{t-1}^{(i)};\,c_t^{(i)}\,]\big), $$
+      <p>where $c_t^{(i)} = \text{Attn}(M_{t-1}^{(i)}, H_t, H_t)$ is what slot $i$ pulls from the new frame, $\tilde{H}_t^{(i)}$ is the candidate content, and $\alpha_t^{(i)} \in [0,1]$ is a learned write gate. A slot holding stable geometry keeps $\alpha$ near zero and barely moves; a slot tracking something that just changed opens up. Nothing is appended, so the state stays exactly $m$ slots wide however long you generate. The gate is where "what to keep" becomes a differentiable decision instead of a hand-written rule.</p>
+
+      <figure>
+        <svg viewBox="0 0 720 250" xmlns="http://www.w3.org/2000/svg" font-family="Inter, sans-serif" font-size="13">
+          <defs>
+            <marker id="ah" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#8b8b95"/></marker>
+          </defs>
+          <rect x="24" y="150" width="86" height="52" rx="9" fill="#f6f6f8" stroke="#e2e2e7"/>
+          <text x="67" y="173" text-anchor="middle" fill="#33333b">frame</text>
+          <text x="67" y="190" text-anchor="middle" fill="#8b8b95" font-size="12">x&#8340;&#8331;&#8321;</text>
+          <rect x="150" y="150" width="96" height="52" rx="9" fill="#f6f6f8" stroke="#e2e2e7"/>
+          <text x="198" y="180" text-anchor="middle" fill="#33333b">encoder</text>
+          <rect x="300" y="44" width="120" height="60" rx="10" fill="#ffffff" stroke="#4b41d8"/>
+          <text x="360" y="70" text-anchor="middle" fill="#3a31b8" font-weight="600">memory M</text>
+          <text x="360" y="88" text-anchor="middle" fill="#8b8b95" font-size="12">m &#215; d slots</text>
+          <rect x="470" y="150" width="110" height="52" rx="9" fill="#f6f6f8" stroke="#e2e2e7"/>
+          <text x="525" y="173" text-anchor="middle" fill="#33333b">decode</text>
+          <text x="525" y="190" text-anchor="middle" fill="#8b8b95" font-size="12">next frame x&#8348;</text>
+          <rect x="616" y="150" width="80" height="52" rx="9" fill="#f6f6f8" stroke="#e2e2e7"/>
+          <text x="656" y="180" text-anchor="middle" fill="#33333b">x&#8348;</text>
+          <line x1="110" y1="176" x2="148" y2="176" stroke="#8b8b95" marker-end="url(#ah)"/>
+          <line x1="246" y1="176" x2="296" y2="176" stroke="#8b8b95" marker-end="url(#ah)"/>
+          <path d="M250,150 C250,110 290,96 300,90" fill="none" stroke="#4b41d8" stroke-dasharray="4 3" marker-end="url(#ah)"/>
+          <text x="250" y="120" text-anchor="end" fill="#3a31b8" font-size="12">write</text>
+          <path d="M420,90 C470,96 500,120 512,148" fill="none" stroke="#4b41d8" stroke-dasharray="4 3" marker-end="url(#ah)"/>
+          <text x="486" y="116" fill="#3a31b8" font-size="12">read</text>
+          <line x1="580" y1="176" x2="614" y2="176" stroke="#8b8b95" marker-end="url(#ah)"/>
+          <path d="M656,150 C656,120 360,120 360,106" fill="none" stroke="#e2e2e7" marker-end="url(#ah)"/>
+        </svg>
+        <figcaption>The read–write loop. The next frame attends over a fixed-size memory (plus a short local window); the produced frame is folded back into memory. Cost per step no longer grows with clip length.</figcaption>
+      </figure>
+
+      <p>The payoff is not just speed. A fixed-size recurrent state changes the asymptotics — per-step cost stops depending on how long you have been generating — but it also changes what the model is <em>encouraged</em> to represent. A bank of $m$ slots you must reuse forever is a bottleneck, and bottlenecks are where abstractions come from. The model cannot keep every frame, so it has to decide what a scene <em>is</em>.</p>
+
+      <h2 id="forget">The hard part: learning what to forget</h2>
+      <p>Here is where I spend most of my week, and where the tidy diagram stops being tidy. Deciding what to <em>write</em> is comparatively easy; deciding what to <em>evict</em> is not, and nobody hands the model labels for it. A slot you overwrite at frame $t$ might have held the only trace of a landmark the model needs again at frame $t+400$. The supervision for that decision arrives four hundred steps too late.</p>
+      <p>So the real problem is credit assignment through the memory update. A few things that actually help, in rough order of how much I trust them:</p>
+      <ul>
+        <li><b>Recurrence, trained through time.</b> If $M_t = g_\phi(M_{t-1}, H_t)$ and the loss lands at frame $t+k$, gradients flow back through the whole update chain, à la Transformer-XL's segment recurrence <a href="#r1">[1]</a>. Expensive, and it fights vanishing signals, but it is the honest version.</li>
+        <li><b>An auxiliary reconstruction loss on memory.</b> Compressive Transformers <a href="#r2">[2]</a> add a loss that forces the compressed memory to still <em>reconstruct</em> what attention would have used it for. It gives the eviction decision a local, immediate gradient instead of a distant one.</li>
+        <li><b>A consistency objective.</b> Video hands you a free label that images do not: return to a place and it should look like itself. Penalizing drift when the camera revisits a region trains memory to hold exactly the persistent scene state we wanted it to hold in the first place.</li>
+      </ul>
+      <p>In practice these fold into a single objective — the generation loss you actually want, a memory-reconstruction term that hands eviction a nearby gradient, and a consistency term that punishes drift when the camera comes back:</p>
+      $$ \mathcal{L} = \mathcal{L}_{\text{gen}} \;+\; \lambda_{\text{mem}}\,\mathcal{L}_{\text{recon}}(M) \;+\; \lambda_{\text{cyc}}\,\mathcal{L}_{\text{consistency}}. $$
+      <p>The two auxiliary terms are scaffolding. They exist to make the far-off consequence of a forgetting decision felt sooner, because the generation loss on its own assigns the credit far too late to be useful.</p>
+      <p>None of these fully solves it. Forgetting is a control problem wearing a representation-learning costume, and the reward is sparse and delayed. But it is the crux — get eviction right and the rest of the system is almost boring.</p>
+
+      <div class="callout"><b>An aside.</b> This is why I distrust benchmarks that only score short clips. A model with no memory and a good decoder looks fine for two seconds. The gap only opens when the camera comes back to somewhere it has been, and most metrics never make it come back.</div>
+
+      <h2 id="where">Where this goes</h2>
+      <p>If you take the memory view seriously, "long video" stops being a context-length arms race and turns into a question about state: what is the smallest thing a model must carry to keep a world consistent, and how does it learn to carry it? That question rhymes with world models <a href="#r3">[3]</a>, with state-space sequence models <a href="#r4">[4]</a>, and with how we ourselves navigate — you do not re-derive your kitchen every time you walk into it; you keep a compressed map and correct it when something is off.</p>
+      <p>I don't think the field is short on ways to make attention cheaper. I think it is short on models that know what is worth remembering. That is the part I find worth working on.</p>
+
+      <hr />
+      <div class="refs">
+        <h3>References</h3>
+        <ol>
+          <li id="r1">Dai, Z., Yang, Z., Yang, Y., Carbonell, J., Le, Q. V., &amp; Salakhutdinov, R. (2019). <a href="https://scholar.google.com/scholar?q=Transformer-XL+Attentive+Language+Models+Beyond+a+Fixed-Length+Context" target="_blank" rel="noopener">Transformer-XL: Attentive Language Models Beyond a Fixed-Length Context</a>. ACL.</li>
+          <li id="r2">Rae, J. W., Potapenko, A., Jayakumar, S. M., &amp; Lillicrap, T. P. (2020). <a href="https://scholar.google.com/scholar?q=Compressive+Transformers+for+Long-Range+Sequence+Modelling" target="_blank" rel="noopener">Compressive Transformers for Long-Range Sequence Modelling</a>. ICLR.</li>
+          <li id="r3">Ha, D., &amp; Schmidhuber, J. (2018). <a href="https://scholar.google.com/scholar?q=Recurrent+World+Models+Facilitate+Policy+Evolution" target="_blank" rel="noopener">World Models</a>. NeurIPS.</li>
+          <li id="r4">Gu, A., &amp; Dao, T. (2023). <a href="https://scholar.google.com/scholar?q=Mamba+Linear-Time+Sequence+Modeling+with+Selective+State+Spaces" target="_blank" rel="noopener">Mamba: Linear-Time Sequence Modeling with Selective State Spaces</a>.</li>
+        </ol>
+      </div>
+
+      <div class="post-foot">
+        <a href="../index.html#writing">← All writing</a>
+        <a href="single-image-world.html">Next: A single image is already a world →</a>
+      </div>
+    </article>
+
+    <script>
+      const tb = document.getElementById("topbar");
+      addEventListener("scroll", () => tb.classList.toggle("scrolled", scrollY > 8), { passive: true });
+      const links = [...document.querySelectorAll(".toc a")];
+      const ids = links.map((a) => a.getAttribute("href").slice(1));
+      const spy = new IntersectionObserver((es) => {
+        es.forEach((e) => { if (e.isIntersecting) {
+          links.forEach((l) => l.classList.remove("active"));
+          const a = links.find((l) => l.getAttribute("href") === "#" + e.target.id);
+          if (a) a.classList.add("active");
+        }});
+      }, { rootMargin: "-70px 0px -70% 0px" });
+      ids.forEach((id) => { const el = document.getElementById(id); if (el) spy.observe(el); });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <title>潜空间的一格 · Dongnan Gui</title>
+    <meta name="description" content="一则简短的现场笔记：有且只有一个长度尺度决定了一次仿真事件能否活着进入生成的视频；为什么我一半的失败都是忽略这个数字造成的；以及我认为接下来该被自动化的是什么。" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;450;500;600&family=JetBrains+Mono:wght@400;500&family=Noto+Serif+SC:wght@500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="blog.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" />
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"
+      onload="renderMathInElement(document.body,{delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}],throwOnError:false})"></script>
+  </head>
+  <body>
+    <header class="topbar" id="topbar">
+      <a class="home" href="../index.zh.html">Dongnan Gui</a>
+      <a href="../index.zh.html#writing">← 全部文章</a>
+      <a href="the-latent-cell.html">English</a>
+    </header>
+
+    <nav class="toc" id="toc">
+      <div class="toc-h">目录</div>
+      <a href="#unit">一个长度单位</a>
+      <a href="#arith">那点算术</a>
+      <a href="#solver">求解器有它自己的尺度</a>
+      <a href="#silhouette">轮廓就是全部信号</a>
+      <a href="#optics">两件与几何无关的事</a>
+      <a href="#next">该被自动化的是什么</a>
+    </nav>
+
+    <article>
+      <div class="post-head">
+        <div class="kicker">现场笔记</div>
+        <h1>潜空间的一格</h1>
+        <div class="meta">
+          <span>2026 年 8 月</span><span class="dot"></span>
+          <span>约 7 分钟</span><span class="dot"></span>
+          <span>仿真条件视频 · 尺度</span>
+        </div>
+      </div>
+
+      <p class="lead">一个小角落的小结：用物理仿真而不是手工 K 的关键帧去驱动视频扩散模型。这条流水线里有且仅有一个数被我低估了，而我记录在案的失败大约有一半来自忽略它。它是一个长度，以毫米计，并且逐个镜头都在变。</p>
+
+      <h2 id="unit">一个长度单位</h2>
+
+      <p>配置本身很直白。一段程序描述一个刚体场景，求解器把它跑起来，渲染产出一路深度图（depth pass），而这路深度图就是那个被冻结的视频模型收到的全部信号。最终片子里你看到的、既不属于几何也不属于时序的一切——材质、颜色、天气、光照——都是模型从文本里编出来的。</p>
+
+      <p>问题在于，模型并不在像素上工作。它的自编码器在空间上做八倍下采样，所以条件信号真正能承载的最细粒度，就是那个潜网格（latent grid）上的一格。记它为 $c$。于是，从经验上看：</p>
+
+      <ul>
+        <li>小于约 $1c$ 的位移根本无法被渲染出来——它压根就不在信号里；</li>
+        <li>而要让观众读出这是<em>运动</em>，大约需要 $2.7c$。</li>
+      </ul>
+
+      <p>真正咬人的地方在于，$c$ 是一个<em>世界中</em>的长度，而不是图像中的，所以它由这一帧覆盖了多少世界来决定：</p>
+
+      $$ c \;=\; 8\cdot\frac{W_{\text{world}}}{W_{\text{px}}}. $$
+
+      <p>在我搭过的那些场景里，$c$ 从桌面镜头的约 6 mm 一直到室外大远景的 120 mm 上下。于是最小可辨运动 $2.7c$ 在桌面上约为 16 mm，在室外约为 180 mm。同样是判定「它动了」，判据相差二十倍，而这完全由我把相机放在哪里决定。</p>
+
+      <div class="callout"><b>为什么这值得写下来。</b>一个物理上正确的仿真，可以正确得完美而不可见。求解器很满意，断言通过，视频里什么都没有。这个失败在你正盯着找问题的那一层上没有任何症状——所以我才会一次次把它误诊成别的东西。</div>
+
+      <h2 id="arith">那点算术，要提前算</h2>
+
+      <p>由此长出来的具体习惯是：在烘焙任何东西之前，先算出这个镜头的 $c$，再拿预期位移去对照 $2.7c$。它把「这个看得出来吗」从一件品味问题变成了一行算术。</p>
+
+      <p>我遇到的最清楚的一例，是一个锤子本该把一道滑门从约 1.65 吨岩石底下顶出去的镜头。实测行程：2 mm，而设计行程是 1.2 m。这不只是看不见——它比阈值还低了三百倍。反解这次碰撞、去求我真正需要的行程，得到的答案是要一把大约十三吨的锤子；这基本可以断定是设计错了，而不是参数错了。</p>
+
+      <p>修法是换一套机构，而它推广成了我现在的出发点：<b>触发应当释放能量，而不是提供能量。</b>不去推那团质量，而是把它脚下的支撑抽掉——同样的 1.65 吨，就从对抗这个镜头的东西，变成了驱动这个镜头的东西。同一个场景、同样的质量、同一个相机；差别却是「什么都看不见」和「整个事件」之间的差别。</p>
+
+      <h2 id="solver">求解器有它自己的尺度，而且和你不一致</h2>
+
+      <p>潜空间的那一格（latent cell）是来自解码器的约束。还有第二个约束来自物理引擎，两者互不相干——所以我被绊了两次。</p>
+
+      <p>引擎会在物体周围留一小圈碰撞裕量——我用的这个默认是 4 mm——而且它对<em>两个</em>物体都生效，所以 8 mm 的间隙才是实际下限。放在一个两米的箱子上，这看不出来。放在一枚 15 mm 的多米诺骨牌上，它占了物体的 27%。我在室外场景里建立起来的每一条直觉，在场景搬到桌面上的那一刻，都错了一个数量级。</p>
+
+      <p>另一个更微妙，我也更喜欢它：在这个引擎里，一个滚动的球在 0.3 m 的行程上会横向漂移约 58 mm。在室外，这是噪声。在桌面上，这就是一个球明明瞄准了、却打偏一个 40 mm 目标的原因。仿真并没有错；错的是我按之设计的那个公差根本不存在。</p>
+
+      <p>所以：<b>每个镜头都有两个长度尺度</b>，一个来自解码器，一个来自求解器；只有当事件比它们俩都大时，这个镜头才是良定的。</p>
+
+      <h2 id="silhouette">在深度条件下，轮廓就是全部信号</h2>
+
+      <p>这是我会告诉任何刚上手的人的一点。如果你交给模型的只有深度，那么物体的轮廓<em>就是</em>物体本身。文本无法补上几何里没有的细节。</p>
+
+      <p>我是这样学到的：我在一个其实只有四个长方体的网格上，写了一段关于门板起皱、玻璃碎裂的精心提示词。渲染出来的是一摞朴素的箱子——完全正确。那些描述损坏的词，在信号里找不到任何可以附着的东西。</p>
+
+      <p>这意味着有辨识度的细节必须被建模出来——而且，绕回开头，它的尺寸要拿潜空间的那一格来衡量，而不是拿现实来衡量。舷梯上的扶手是一个有真实尺寸的真实物体，但决定它能不能活下来的问题是：在你实际拍的那一帧里，它的立柱有没有超过 $c$。</p>
+
+      <p>这一点我是真去核对过的，不是假设的：配对实验，提示词和随机种子完全相同，几何只差一个焊上去的特征。渲染结果确实可测地朝着提到该特征的描述靠拢。而在第一轮里，它们看上去并没有——那后来被证明是一个测量问题，<a href="metrics-that-lie.html#four">本身是另一个故事</a>。</p>
+
+      <h2 id="optics">两件与几何无关的事</h2>
+
+      <p>有两次失败完全套不进长度尺度这个故事，而它们都是光学问题。</p>
+
+      <p><b>扬起的灰尘，不逆光就等于不存在。</b>两个共用同一份深度条件的镜头，提示词都要了灰尘：日光那一条里它完全看不见，朝着敞开的棚屋门拍的那一条里，它扛起了整场坍塌。悬浮颗粒在光学上是薄的。正面打光几乎什么也不加；背面打光则前向散射，直接变成主体。这是提示词那一侧和相机那一侧的决定，再多的几何也修不好。</p>
+
+      <p><b>视锥体之外的缺陷不算缺陷。</b>一列多米诺末端的一枚在第 2 帧前后自己倒了，我在座高和摩擦上花了不少真功夫，才想起来去看看它在哪儿。它待在 $x=-0.635$，而镜头在 $x=0.24$，视野宽 0.72 m。它压根就没进过画。先看画框，再为修复付钱。</p>
+
+      <h2 id="next">我认为接下来该被自动化的是什么</h2>
+
+      <p>上面这一切，眼下都靠一个人去注意到某个数字。这是把它放错了地方，因为它们全都可以推导出来：相机和分辨率给你 $c$，引擎的配置给你裕量，而程序里本来就声明了哪些物体该动、按什么顺序动。这里没有一处需要品味。</p>
+
+      <p>所以我觉得有意思的方向是一个<b>了解解码器的规划器</b>（decoder-aware planner）——它接过预期的事件，从「最终要渲染它的那个东西」的约束里反推几何尺度，而不是先造出一个物理上合理的场景、事后才发现它低于阈值。具体一点：一套测试装置，把程序产出的条件信号拿去对照由解码器算出的约束来度量，并把失败连同出问题的物体和具体数字一起交还回来，好让下一版是一次修复，而不是一次重采样。</p>
+
+      <p>我认为修复胜过重采样的理由很窄，但我相信它：盲抽若干版草稿再挑最好的一版，修不了一个因果上的倒置，因为没有哪一版里包含那个修法。你可以把好几倍的算力砸在更多采样上，仍然输给「一版草稿加一次测量」——只要那次测量具体到足以指出该改什么。</p>
+
+      <p>同一个想法更宽的版本，也是我一直在这个角落里做下去的原因：视频模型对它里面的任何东西都没有持久的身份，所以它无法被编辑——你想要一个更重的箱子，唯一能做的就是换一个种子。程序则可以被编辑，因为那个箱子有名字。在我看来，后者才是更值得握在手里的东西。</p>
+
+      <div class="post-foot">
+        <a href="metrics-that-lie.html">← 上一篇：我的指标骗了我四次</a>
+        <a href="../index.zh.html#writing">全部文章 →</a>
+      </div>
+    </article>
+
+    <script>
+      const tb = document.getElementById("topbar");
+      addEventListener("scroll", () => tb.classList.toggle("scrolled", scrollY > 8), { passive: true });
+      const links = [...document.querySelectorAll(".toc a")];
+      const ids = links.map((a) => a.getAttribute("href").slice(1));
+      const spy = new IntersectionObserver((es) => {
+        es.forEach((e) => { if (e.isIntersecting) {
+          links.forEach((l) => l.classList.remove("active"));
+          const a = links.find((l) => l.getAttribute("href") === "#" + e.target.id);
+          if (a) a.classList.add("active");
+        }});
+      }, { rootMargin: "-70px 0px -70% 0px" });
+      ids.forEach((id) => { const el = document.getElementById(id); if (el) spy.observe(el); });
+    </script>
+  </body>
+</html>

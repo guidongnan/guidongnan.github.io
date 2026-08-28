@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <title>We taught photos to move before we asked whether they wanted to · Dongnan Gui</title>
+    <meta name="description" content="On the quieter side of image-to-video: protecting the people in the picture instead of chasing the forgery afterward." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;450;500;600&family=JetBrains+Mono:wght@400;500&family=Noto+Serif+SC:wght@500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="blog.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" />
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"
+      onload="renderMathInElement(document.body,{delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}],throwOnError:false})"></script>
+  </head>
+  <body>
+    <header class="topbar" id="topbar">
+      <a class="home" href="../index.html">Dongnan Gui</a>
+      <a href="../index.html#writing">← All writing</a>
+      <a href="i2v-consent.zh.html">中文</a>
+    </header>
+
+    <nav class="toc" id="toc">
+      <div class="toc-h">Contents</div>
+      <a href="#capability">A capability that keeps you up</a>
+      <a href="#reactive">Output-side safety is reactive</a>
+      <a href="#input">Protecting the input</a>
+      <a href="#modules">How the perturbation is built</a>
+      <a href="#hard">Why it is hard</a>
+      <a href="#asym">The asymmetry I care about</a>
+    </nav>
+
+    <article>
+      <div class="post-head">
+        <div class="kicker">Notes on video generation</div>
+        <h1>We taught photos to move before we asked whether they wanted to</h1>
+        <div class="meta">
+          <span>August 2026</span><span class="dot"></span>
+          <span>~8 min</span><span class="dot"></span>
+          <span>image-to-video · safety · adversarial protection</span>
+        </div>
+      </div>
+
+      <p class="lead">Image-to-video is one of those capabilities that feels like magic for about a week and then starts to keep you up. Any still photo can be animated now — including one of a real person who never agreed to move.</p>
+
+      <h2 id="capability">A capability that keeps you up</h2>
+      <p>The technical progress is genuinely wonderful; I work on it and I mean that. But animation lowers a barrier that used to protect people by accident. A photograph was a fixed thing. Now a single portrait — scraped from a profile, a news article, a group photo — is enough raw material to put someone in motion, saying or doing something they never did. The gap between "a picture of you exists" and "a video of you exists" used to be large. It is now one forward pass.</p>
+
+      <h2 id="reactive">Output-side safety is reactive</h2>
+      <p>Almost all of the safety conversation in generative media is about the output. Watermark the generated video; train a detector to flag it; keep a registry of fakes. This work matters and I am glad people do it. But notice the timing: every one of these acts <em>after</em> the video exists. By the time you are detecting a clip, it has already been made, shared, and seen. Watermarks can be cropped or re-encoded away; detectors chase a distribution that shifts with every new model. It is a defense that is always one step behind the thing it defends against, because it only gets to move second.</p>
+      <div class="callout"><b>The reframing.</b> Instead of asking "how do we recognize a fake after it is made," ask "how do we make a photo that resists being animated in the first place." Move the defense to the input, where it gets to go first.</div>
+
+      <h2 id="input">Protecting the input</h2>
+      <p>The idea borrows from adversarial examples, but flips their intent. Adversarial attacks add an imperceptible perturbation to make a model fail; here, that failure is the <em>feature</em>. You compute a small perturbation $\delta$, added to the image before it is ever shared, that quietly breaks image-to-video models while leaving the photo looking normal to a person:</p>
+      $$ \delta^\star \;=\; \arg\max_{\lVert \delta \rVert_\infty \le \epsilon} \; \mathcal{L}\big(f(x+\delta)\big), \qquad x+\delta \approx x \;\text{to a human.} $$
+      <p>Here $f$ is the image-to-video model and $\mathcal{L}$ rewards it for producing something unusable — a frozen, incoherent, or visibly broken clip — while the $\epsilon$-budget keeps $\delta$ imperceptible. The person shares $x+\delta$ instead of $x$. To any human eye it is the same photo; to a generative video model it is quicksand. The protection travels <em>with the image</em>, so it works wherever the image ends up, without anyone having to detect anything later.</p>
+
+      <h2 id="modules">How the perturbation is built</h2>
+      <p>"Break the model" is too blunt an objective. A still image gives an image-to-video system several separate things to latch onto, and a protection is only as strong as the channel it forgets. It helps to split the attack the way the model's own computation splits — into <b>spatial</b>, <b>temporal</b>, and <b>diffusion</b> terms.</p>
+      <ul>
+        <li><b>Spatial.</b> Corrupt the per-frame appearance the model reads out of the still image, so the content it tries to animate is already unreliable.</li>
+        <li><b>Temporal.</b> Attack the motion itself — steer the model toward incoherent or frozen dynamics, so that even plausibly rendered frames refuse to add up to plausible movement.</li>
+        <li><b>Diffusion.</b> Exploit the sampler. Because these models denoise over many steps, a perturbation amplified <em>along</em> the trajectory does far more damage than one measured only at the input, so the objective is taken through the diffusion process rather than around it.</li>
+      </ul>
+      <p>The full objective is a weighted sum of the three, still under one imperceptibility budget:</p>
+      $$ \delta^\star = \arg\max_{\lVert\delta\rVert_\infty \le \epsilon} \; \lambda_s\,\mathcal{L}_{\text{spatial}} + \lambda_t\,\mathcal{L}_{\text{temporal}} + \lambda_d\,\mathcal{L}_{\text{diffusion}}. $$
+      <p>Splitting it this way is not tidiness for its own sake. Each term closes a door the others leave open, and a defense that shuts only one is a defense an attacker simply walks around.</p>
+
+      <h2 id="hard">Why it is hard</h2>
+      <p>Stated that cleanly it sounds solved. It is not, and the reasons are worth being honest about.</p>
+      <ul>
+        <li><b>Transfer.</b> You almost never have white-box access to the model an attacker will use. A perturbation tuned against one image-to-video system has to survive against others it never saw — different architectures, different latent spaces. Cross-model transfer is the whole ballgame, and it is fragile.</li>
+        <li><b>The imperceptibility budget.</b> Push $\epsilon$ up and protection gets robust but the photo starts to look off; push it down and the photo stays clean but the protection is easy to wash out. That trade-off is real and unforgiving.</li>
+        <li><b>Purification.</b> A mild blur, a re-compression, a downscale-and-upscale can strip a fragile perturbation before the image ever reaches the generator. Protection has to survive the ordinary indignities of being posted online.</li>
+        <li><b>The arms race.</b> Any fixed defense invites a model trained to ignore it. This is not a problem you solve once; it is a position you hold.</li>
+      </ul>
+
+      <h2 id="asym">The asymmetry I care about</h2>
+      <p>It is a strange pair of projects to hold at the same time. One season you teach images to move; the next you teach them to refuse. But there is an asymmetry that makes the second project feel more urgent than elegant. The people building generative video systems are well resourced and organized. The people whose faces end up inside those systems — mostly — are not. They did not opt in, they will not be consulted, and today they have essentially nothing on their side.</p>
+      <p>Input-side protection will not fix that on its own, and I do not want to oversell a perturbation as a shield it is not. But I would rather the individual in the photograph have <em>something</em> than nothing, and I would rather the defense get to move first for once. That is enough of a reason to work on it.</p>
+
+      <hr />
+      <div class="refs">
+        <h3>References</h3>
+        <ol>
+          <li id="r1">Salman, H., Khaddaj, A., Leclerc, G., Ilyas, A., &amp; Madry, A. (2023). <a href="https://scholar.google.com/scholar?q=Raising+the+Cost+of+Malicious+AI-Powered+Image+Editing+PhotoGuard" target="_blank" rel="noopener">Raising the Cost of Malicious AI-Powered Image Editing</a> (PhotoGuard). ICML.</li>
+          <li id="r2">Shan, S., Cryan, J., Wenger, E., Zheng, H., Hanocka, R., &amp; Zhao, B. Y. (2023). <a href="https://scholar.google.com/scholar?q=Glaze+Protecting+Artists+from+Style+Mimicry+by+Text-to-Image+Models" target="_blank" rel="noopener">Glaze: Protecting Artists from Style Mimicry by Text-to-Image Models</a>. USENIX Security.</li>
+          <li id="r3">Gui, D., Guo, X., Zhou, W., &amp; Lu, Y. (2025). <a href="https://openaccess.thecvf.com/content/CVPR2025/html/Gui_I2VGuard_Safeguarding_Images_against_Misuse_in_Diffusion-based_Image-to-Video_Models_CVPR_2025_paper.html" target="_blank" rel="noopener">I2VGuard: Safeguarding Images against Misuse in Diffusion-based Image-to-Video Models</a>. CVPR.</li>
+        </ol>
+      </div>
+
+      <div class="post-foot">
+        <a href="single-image-world.html">← A single image is already a world</a>
+        <a href="../index.html#writing">All writing →</a>
+      </div>
+    </article>
+
+    <script>
+      const tb = document.getElementById("topbar");
+      addEventListener("scroll", () => tb.classList.toggle("scrolled", scrollY > 8), { passive: true });
+      const links = [...document.querySelectorAll(".toc a")];
+      const spy = new IntersectionObserver((es) => {
+        es.forEach((e) => { if (e.isIntersecting) {
+          links.forEach((l) => l.classList.remove("active"));
+          const a = links.find((l) => l.getAttribute("href") === "#" + e.target.id);
+          if (a) a.classList.add("active");
+        }});
+      }, { rootMargin: "-70px 0px -70% 0px" });
+      links.map((a) => a.getAttribute("href").slice(1)).forEach((id) => { const el = document.getElementById(id); if (el) spy.observe(el); });
+    </script>
+  </body>
+</html>

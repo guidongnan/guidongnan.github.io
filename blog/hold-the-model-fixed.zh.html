@@ -1,0 +1,466 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <title>把模型冻住 · Dongnan Gui</title>
+    <meta name="description" content="三个系统，同一个动作：在一个自身没有任何可寻址状态的生成器上游，放一个有名字、有预算、可审计的状态。为什么可控性、长时程一致性和评测其实是同一个问题，以及我在两个毫不相干的代码库里意外证明了两次的那条规律。" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;450;500;600&family=JetBrains+Mono:wght@400;500&family=Noto+Serif+SC:wght@500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="blog.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" />
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"
+      onload="renderMathInElement(document.body,{delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}],throwOnError:false})"></script>
+  </head>
+  <body>
+    <header class="topbar" id="topbar">
+      <a class="home" href="../index.zh.html">Dongnan Gui</a>
+      <a href="../index.zh.html#writing">← 全部文章</a>
+      <a href="hold-the-model-fixed.html">English</a>
+    </header>
+
+    <nav class="toc" id="toc">
+      <div class="toc-h">目录</div>
+      <a href="#name">里面没有任何东西有名字</a>
+      <a href="#move">那个动作</a>
+      <a href="#law">我意外证明了两次的规律</a>
+      <a href="#inside">把审计放进产物内部</a>
+      <a href="#discriminate">不会失败的检查器不是检查器</a>
+      <a href="#buys">更大的模型买不到的东西</a>
+      <a href="#dont">我还没有证明的事</a>
+      <a href="#next">我想把它推向哪里</a>
+    </nav>
+
+    <article>
+      <div class="post-head">
+        <div class="kicker">随笔</div>
+        <h1>把模型冻住</h1>
+        <div class="meta">
+          <span>2026 年 8 月</span><span class="dot"></span>
+          <span>约 16 分钟</span><span class="dot"></span>
+          <span>生成式视频 · 智能体 · 可问责性</span>
+        </div>
+      </div>
+
+      <p class="lead">今年我做了三个看上去毫不相干的系统：一套用于长视频生成的记忆机制、一个写物理程序去驱动冻结视频模型的智能体（agent），还有一条「段落 → 图像 → 文本」的往返链路。写论文的时候我才发现，它们其实是同一个系统被我做了三遍。每一个都拿走了生成模型眼里那团无法寻址的流体，给它一个名字、一份预算，再配一个审计者。我想论证的是：这不是风格偏好，而是真正承重的那一步——而这个领域的钱，大多花在了另一步上。</p>
+
+      <p>其中一部分正在匿名评审中，所以长视频那项工作在这里既不出现名字，也不出现数字。这个代价比你以为的要小，因为真正值得争论的部分是结构性的。</p>
+
+      <h2 id="name">里面没有任何东西有名字</h2>
+
+      <p>先从一个具体的失败讲起。你让一个视频模型「把第三个箱子变重一点」。除了换一个随机种子（seed），你没有别的招——而换种子会改掉每一个物体、每一帧、每一种材质，因为模型并不为那个箱子保存任何持久的身份。根本就没有箱子。有的只是一个像素上的分布，它这一次恰好排成了箱子的样子。</p>
+
+      <p>话一旦说到这个份上，这个领域当作四件事在做的四个问题，就塌缩成了一个：</p>
+
+      <figure class="plain">
+        <svg viewBox="0 0 820 330" role="img" aria-label="上排：请求进入一个不透明的分布，出来的是视频，其中没有任何可寻址的部分。下排：请求先变成一个带具名符号的程序，程序产出先验，冻结模型据此渲染，于是可以只给一个符号打补丁。">
+          <defs>
+            <marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#8b8b95"/></marker>
+          </defs>
+          <text x="0" y="14" font-family="Inter, system-ui, sans-serif" font-size="12" font-weight="600" fill="#8b8b95" letter-spacing="1.4">现在的做法</text>
+          <rect x="0" y="32" width="92" height="50" rx="9" fill="#fff" stroke="#e2e2e7"/>
+          <text x="46" y="62" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="13" fill="#33333b">请求</text>
+          <line x1="98" y1="57" x2="118" y2="57" stroke="#8b8b95" marker-end="url(#a1)"/>
+          <rect x="124" y="24" width="196" height="66" rx="12" fill="#f6f6f8" stroke="#e2e2e7" stroke-dasharray="5 4"/>
+          <text x="222" y="51" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="13" fill="#33333b">一个像素上的分布</text>
+          <text x="222" y="71" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="12" fill="#8b8b95">其中没有任何部分有名字</text>
+          <line x1="326" y1="57" x2="346" y2="57" stroke="#8b8b95" marker-end="url(#a1)"/>
+          <rect x="352" y="32" width="84" height="50" rx="9" fill="#fff" stroke="#e2e2e7"/>
+          <text x="394" y="62" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="13" fill="#33333b">视频</text>
+          <text x="470" y="46" font-family="Inter, system-ui, sans-serif" font-size="12.5" fill="#c2412d">「把第三个箱子变重」</text>
+          <text x="470" y="66" font-family="Inter, system-ui, sans-serif" font-size="12.5" fill="#8b8b95">→ 唯一的招是换一个新种子</text>
+          <text x="470" y="84" font-family="Inter, system-ui, sans-serif" font-size="12.5" fill="#8b8b95">→ 每个物体、每一帧都变了</text>
+
+          <line x1="0" y1="128" x2="820" y2="128" stroke="#ececef"/>
+
+          <text x="0" y="164" font-family="Inter, system-ui, sans-serif" font-size="12" font-weight="600" fill="#4b41d8" letter-spacing="1.4">上游放一个具名状态</text>
+          <rect x="0" y="184" width="92" height="50" rx="9" fill="#fff" stroke="#e2e2e7"/>
+          <text x="46" y="214" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="13" fill="#33333b">请求</text>
+          <line x1="98" y1="209" x2="118" y2="209" stroke="#8b8b95" marker-end="url(#a1)"/>
+          <rect x="124" y="172" width="156" height="74" rx="10" fill="#fff" stroke="#4b41d8"/>
+          <text x="202" y="192" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="13" fill="#16161a" font-weight="600">程序</text>
+          <text x="202" y="212" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="11" fill="#4b41d8">crate_02 · hammer</text>
+          <text x="202" y="230" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="11" fill="#4b41d8">pivot · camera</text>
+          <line x1="286" y1="209" x2="306" y2="209" stroke="#8b8b95" marker-end="url(#a1)"/>
+          <rect x="312" y="184" width="84" height="50" rx="9" fill="#fff" stroke="#e2e2e7"/>
+          <text x="354" y="214" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="13" fill="#33333b">先验</text>
+          <line x1="402" y1="209" x2="422" y2="209" stroke="#8b8b95" marker-end="url(#a1)"/>
+          <rect x="428" y="184" width="116" height="50" rx="9" fill="#f6f6f8" stroke="#e2e2e7"/>
+          <text x="486" y="207" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="13" fill="#33333b">冻结模型</text>
+          <text x="486" y="224" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="11" fill="#8b8b95">从不训练</text>
+          <line x1="550" y1="209" x2="570" y2="209" stroke="#8b8b95" marker-end="url(#a1)"/>
+          <rect x="576" y="184" width="84" height="50" rx="9" fill="#fff" stroke="#e2e2e7"/>
+          <text x="618" y="214" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="13" fill="#33333b">视频</text>
+          <text x="0" y="282" font-family="JetBrains Mono, monospace" font-size="11.5" fill="#4b41d8">crate_02.mass × 3</text>
+          <text x="152" y="282" font-family="Inter, system-ui, sans-serif" font-size="12.5" fill="#8b8b95">→ 一个只瞄准单个符号的补丁</text>
+          <text x="392" y="282" font-family="Inter, system-ui, sans-serif" font-size="12.5" fill="#8b8b95">→ 其余一切可证明毫发无损</text>
+          <text x="0" y="314" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#8b8b95">两排里的生成器完全一样。唯一的差别是：它的上游有没有东西拥有名字。</text>
+        </svg>
+        <figcaption>一张图讲完整篇论证。生成器没有指称对象，所以最小的一次编辑也只能是整体重生成。在上游放一个程序，箱子就重新有了名字。</figcaption>
+      </figure>
+
+      <ul>
+        <li><b>你无法编辑</b>，因为没有把手可抓。于是唯一可用的操作是重新采样，而重新采样修不好一个被颠倒的因果链——五份草稿里没有一份包含那个修正。</li>
+        <li><b>你无法验证</b>，因为输出不携带任何命题。于是我们退回到分布式指标，而它们量的是典型性（typicality）——典型性恰恰是<a href="metrics-that-lie.html#one">什么都不做时取到最大值</a>的。</li>
+        <li><b>你无法记忆</b>，因为没有槽位可写。于是身份会漂移，而这个领域的绕行办法是回头再读一遍过去的逐字切片。</li>
+        <li><b>你无法接地</b>（grounding），因为证据无处附着。于是一个流畅的模型会用原文自己的词汇编造出具体细节，还因此拿到高分。</li>
+      </ul>
+
+      <p>可控性、评测、长时程一致性、幻觉。四个社区，四套基准。缺的是同一样东西：指称（reference）。</p>
+
+      <figure class="plain">
+        <svg viewBox="0 0 780 210" role="img" aria-label="四个彼此独立的研究问题——无法编辑、无法验证、无法记忆、无法接地——都追溯到同一个原因：没有东西有名字。">
+          <defs>
+            <marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#c9c9d1"/></marker>
+          </defs>
+          <rect x="0" y="6" width="210" height="40" rx="8" fill="#fff" stroke="#e2e2e7"/>
+          <text x="16" y="31" font-family="Inter, system-ui, sans-serif" font-size="13.5" fill="#33333b">无法<tspan font-weight="600" fill="#16161a">编辑</tspan> — 没有把手</text>
+          <rect x="0" y="56" width="210" height="40" rx="8" fill="#fff" stroke="#e2e2e7"/>
+          <text x="16" y="81" font-family="Inter, system-ui, sans-serif" font-size="13.5" fill="#33333b">无法<tspan font-weight="600" fill="#16161a">验证</tspan> — 没有命题</text>
+          <rect x="0" y="106" width="210" height="40" rx="8" fill="#fff" stroke="#e2e2e7"/>
+          <text x="16" y="131" font-family="Inter, system-ui, sans-serif" font-size="13.5" fill="#33333b">无法<tspan font-weight="600" fill="#16161a">记忆</tspan> — 没有槽位</text>
+          <rect x="0" y="156" width="210" height="40" rx="8" fill="#fff" stroke="#e2e2e7"/>
+          <text x="16" y="181" font-family="Inter, system-ui, sans-serif" font-size="13.5" fill="#33333b">无法<tspan font-weight="600" fill="#16161a">接地</tspan> — 没有锚点</text>
+          <path d="M214 26 C 300 26, 320 101, 392 101" fill="none" stroke="#c9c9d1" marker-end="url(#a2)"/>
+          <path d="M214 76 C 300 76, 320 101, 392 101" fill="none" stroke="#c9c9d1" marker-end="url(#a2)"/>
+          <path d="M214 126 C 300 126, 320 101, 392 101" fill="none" stroke="#c9c9d1" marker-end="url(#a2)"/>
+          <path d="M214 176 C 300 176, 320 101, 392 101" fill="none" stroke="#c9c9d1" marker-end="url(#a2)"/>
+          <rect x="400" y="76" width="200" height="50" rx="10" fill="#4b41d8"/>
+          <text x="500" y="107" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="15" font-weight="600" fill="#fff">没有东西有名字</text>
+          <text x="624" y="96" font-family="Inter, system-ui, sans-serif" font-size="12.5" fill="#8b8b95">四个社区，</text>
+          <text x="624" y="114" font-family="Inter, system-ui, sans-serif" font-size="12.5" fill="#8b8b95">缺同一样东西</text>
+        </svg>
+        <figcaption>四条文献线，四套基准，一个原因。</figcaption>
+      </figure>
+
+      <h2 id="move">那个动作</h2>
+
+      <p>所以：把生成器冻住，在它上游放一个有名字、有预算、可审计的状态。三个系统里，生成模型都是刻意被冻结或固定的，而每一条梯度、每一个 token、我投进去的每一个小时，都花在表示本身和它的审计上。</p>
+
+      <p>在智能体视频那项工作里，这是字面意义上的做法。语言模型针对一套很窄的物理 DSL 写出 Python 程序；求解器把它烘焙（bake）出来；烘焙产出一路条件信号——深度、法向、分割，或者接触图——冻结的视频扩散模型（diffusion model）据此渲染。没有任何东西去微调视频模型。整个优化目标就是那段代码。而因为中间表示是一个程序，程序里的物体和烘焙结果共享同一套名字，那个箱子现在叫 <code>crate_02</code>，你可以对着它提问。</p>
+
+      <p>在长视频那项工作里，同一个动作表现为一个预算问题。一旦你把 KV 预算固定下来，有意思的问题就不再是<em>我该保留多少历史</em>，而是<em>这份预算买到了什么</em>。现有系统把它花在逐字 token 上：要么留最近的若干帧，得到保真度但没有跨度；要么冻结开头的一个切片，得到跨度却永不更新，并且悄悄把后面每一帧都往第一帧拽。另一种花法，是把同样的预算花在对整段历史的学习式摘要上，按层级逐步粗化，使得没有哪个时期完全缺席，也没有哪个时期被冻住。</p>
+
+      <figure class="plain">
+        <svg viewBox="0 0 780 250" role="img" aria-label="同一份固定预算的三种花法。最近窗口只覆盖结尾。冻结的开头切片只覆盖开头且永不更新。学习到的层级式摘要覆盖整个跨度：旧历史粗，近期细。">
+          <text x="0" y="12" font-family="Inter, system-ui, sans-serif" font-size="12" fill="#8b8b95">同一份固定预算，三种花法</text>
+          <text x="196" y="236" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#8b8b95">第一帧</text>
+          <text x="690" y="236" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#8b8b95">现在</text>
+          <line x1="196" y1="214" x2="744" y2="214" stroke="#e2e2e7"/>
+
+          <text x="0" y="48" font-family="Inter, system-ui, sans-serif" font-size="13" fill="#33333b">最近窗口</text>
+          <text x="0" y="66" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#8b8b95">有保真，无跨度</text>
+          <rect x="196" y="36" width="548" height="22" rx="3" fill="#f6f6f8"/>
+          <rect x="628" y="36" width="116" height="22" rx="3" fill="#a8a8b4"/>
+
+          <text x="0" y="110" font-family="Inter, system-ui, sans-serif" font-size="13" fill="#33333b">冻结开头</text>
+          <text x="0" y="128" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#8b8b95">有跨度，永不更新</text>
+          <rect x="196" y="98" width="548" height="22" rx="3" fill="#f6f6f8"/>
+          <rect x="196" y="98" width="104" height="22" rx="3" fill="#c2412d" opacity="0.7"/>
+          <text x="312" y="114" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#c2412d">把后面的帧不断拉回第 1 帧</text>
+
+          <text x="0" y="176" font-family="Inter, system-ui, sans-serif" font-size="13" font-weight="600" fill="#16161a">学习式摘要</text>
+          <text x="0" y="194" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#8b8b95">覆盖全程，由粗到细</text>
+          <rect x="196" y="164" width="200" height="22" rx="3" fill="#4b41d8" opacity="0.3"/>
+          <rect x="400" y="164" width="140" height="22" rx="3" fill="#4b41d8" opacity="0.45"/>
+          <rect x="544" y="164" width="100" height="22" rx="3" fill="#4b41d8" opacity="0.68"/>
+          <rect x="648" y="164" width="96" height="22" rx="3" fill="#4b41d8"/>
+          <text x="196" y="156" font-family="Inter, system-ui, sans-serif" font-size="11" fill="#8b8b95">粗，但始终在场</text>
+          <text x="660" y="156" font-family="Inter, system-ui, sans-serif" font-size="11" fill="#8b8b95">细</text>
+        </svg>
+        <figcaption>每一排的 token 数量完全相同。问题从来不是保留多少历史，而是这份预算被花在了什么上。</figcaption>
+      </figure>
+
+      <p>在往返链路那项工作里，它表现为坚持中间表示必须是公开的。一个冻结的生成器把一段文字渲染成图像；一个训练过的阅读器再把它读回来。显而易见的风险是两端会协同适应出一套私有编码——一条恰好能用、却什么也不意味着的隐写信道。检验方式简单到有点难为情：把同一张图交给一个<em>没有训练过</em>的阅读器，让它描述这张图。它描述得很准。里面装着的确实是一张真正可读的图像，而不是两方共享的密文。</p>
+
+      <div class="callout"><b>为什么是「有名字」而不是「有结构」。</b> 结构很廉价；有的是流水线里躺着一张没人能寻址的场景图。真正要紧的是：一个来自人的请求——「从左边数第三个油漆桶」——能解析到一个符号，而程序和产物对这个符号的所指是一致的。这才让一次编辑成为补丁而不是重生成，也才让一次检查成为谓词而不是感觉。</div>
+
+      <h2 id="law">我意外证明了两次的规律</h2>
+
+      <p>这一段是我没有计划过的；如果只见过一次，我不会相信。</p>
+
+      <p><b>在智能体那项工作里。</b>我在同一批意图上跑了四组，同一个模型、同一段系统提示，任何一组都从未见过那些断言。单次生成的基线（baseline）在 91 条里通过 27 条。五选一采样——五份独立程序，由它自己的验证器挑出赢家——通过 30 条，比单次生成高不了多少，而且<em>低于</em>朴素迭代修复的 31 条。测量框架（harness）那一组，针对「模型如何消费这路信号」推导出的约束来做修复，通过 42 条。差距恰恰集中在你会预料到的地方：因果顺序断言上，测量框架 40 条里通过 21 条，采样只有 7 条。五次独立尝试修不好一条被颠倒的链，因为修正根本不在这五份里的任何一份中。</p>
+
+      <p>接着是更锋利的一版，在一个配对好的 12 条意图子集上。我那个自主智能体，带记忆、带检索、14 步预算，烧掉的 token 大约是朴素固定循环的三倍——分数反而更低，6 比 7。催它早点收工只会让它严格地更糟。把步数预算提到 24、其他什么都不改，它到了 8。更多无方向的自主性是负收益。全部效果都来自更多<em>有的放矢的修复轮次</em>。</p>
+
+      <figure class="plain">
+        <svg viewBox="0 0 780 252" role="img" aria-label="四组结果的条形图。91 条意图中通过数：单次生成 27，五选一采样 30，朴素迭代 31，测量框架 42。40 条因果顺序断言中通过数：9、7、19、21。">
+          <text x="0" y="12" font-family="Inter, system-ui, sans-serif" font-size="12" fill="#8b8b95">通过的意图数 / 91</text>
+          <text x="470" y="12" font-family="Inter, system-ui, sans-serif" font-size="12" fill="#8b8b95">因果顺序 / 40</text>
+
+          <text x="0" y="48" font-family="Inter, system-ui, sans-serif" font-size="13" fill="#33333b">单次生成</text>
+          <rect x="128" y="34" width="116" height="18" rx="3" fill="#d8d8de"/>
+          <text x="252" y="48" font-family="Inter, system-ui, sans-serif" font-size="12.5" fill="#8b8b95">27</text>
+          <rect x="470" y="34" width="52" height="18" rx="3" fill="#d8d8de"/>
+          <text x="530" y="48" font-family="Inter, system-ui, sans-serif" font-size="12.5" fill="#8b8b95">9</text>
+
+          <text x="0" y="98" font-family="Inter, system-ui, sans-serif" font-size="13" fill="#33333b">五选一采样</text>
+          <rect x="128" y="84" width="129" height="18" rx="3" fill="#c2412d" opacity="0.7"/>
+          <text x="265" y="98" font-family="Inter, system-ui, sans-serif" font-size="12.5" fill="#8b8b95">30</text>
+          <rect x="470" y="84" width="40" height="18" rx="3" fill="#c2412d" opacity="0.7"/>
+          <text x="518" y="98" font-family="Inter, system-ui, sans-serif" font-size="12.5" fill="#c2412d">7</text>
+
+          <text x="0" y="148" font-family="Inter, system-ui, sans-serif" font-size="13" fill="#33333b">朴素迭代</text>
+          <rect x="128" y="134" width="133" height="18" rx="3" fill="#a8a8b4"/>
+          <text x="269" y="148" font-family="Inter, system-ui, sans-serif" font-size="12.5" fill="#8b8b95">31</text>
+          <rect x="470" y="134" width="110" height="18" rx="3" fill="#a8a8b4"/>
+          <text x="588" y="148" font-family="Inter, system-ui, sans-serif" font-size="12.5" fill="#8b8b95">19</text>
+
+          <text x="0" y="198" font-family="Inter, system-ui, sans-serif" font-size="13" font-weight="600" fill="#16161a">测量框架</text>
+          <rect x="128" y="184" width="180" height="18" rx="3" fill="#4b41d8"/>
+          <text x="316" y="198" font-family="Inter, system-ui, sans-serif" font-size="12.5" font-weight="600" fill="#4b41d8">42</text>
+          <rect x="470" y="184" width="122" height="18" rx="3" fill="#4b41d8"/>
+          <text x="600" y="198" font-family="Inter, system-ui, sans-serif" font-size="12.5" font-weight="600" fill="#4b41d8">21</text>
+
+          <text x="0" y="238" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#8b8b95">同一模型、同一系统提示、同一批意图。任何一组都没有见过断言。</text>
+        </svg>
+        <figcaption>采样五次再挑最好的，只比单次生成高出一点点，而且低于朴素修复。真正的差别住在右边那一栏。</figcaption>
+      </figure>
+
+      <p><b>在记忆那项工作里。</b>完全不同的代码库、不同的模态、我人生中不同的一年。我把记忆容量和一个扩到同样大小的逐字 KV 缓存放在一起做扫描。逐字缓存先是变好，然后平平地饱和——而且恰好饱和在它被训练去关注的那个上下文长度上。给它更多它本来就有的东西，什么也没买到。压缩记忆在同一次扫描里，全程单调变好。</p>
+
+      <p>两个系统，没有共享代码，除我之外没有共享作者，却是同一个形状：</p>
+
+      <figure class="plain">
+        <svg viewBox="0 0 820 292" role="img" aria-label="两个面板。左：不断增加同一种无方向的资源，曲线先升后平。右：把预算换成有结构的东西，曲线持续上升。">
+          <g transform="translate(4,18)">
+            <text x="0" y="0" font-family="Inter, system-ui, sans-serif" font-size="13" font-weight="600" fill="#16161a">同一种货币，买得更多</text>
+            <text x="0" y="19" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#8b8b95">更多采样 · 更长上下文 · 更多自主性</text>
+            <line x1="0" y1="196" x2="350" y2="196" stroke="#e2e2e7"/>
+            <line x1="0" y1="40" x2="0" y2="196" stroke="#e2e2e7"/>
+            <path d="M0 184 C 50 142, 80 102, 126 95 C 200 86, 270 84, 350 83" fill="none" stroke="#8b8b95" stroke-width="2.5"/>
+            <line x1="126" y1="95" x2="126" y2="196" stroke="#c2412d" stroke-width="1" stroke-dasharray="4 4"/>
+            <circle cx="126" cy="95" r="4.5" fill="#c2412d"/>
+            <text x="138" y="126" font-family="Inter, system-ui, sans-serif" font-size="12" fill="#c2412d">在这里饱和</text>
+            <text x="138" y="143" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#8b8b95">汇率 → 0</text>
+            <text x="0" y="218" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#8b8b95">预算 →</text>
+            <text x="0" y="242" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#8b8b95">五选一采样 · 给逐字缓存更多空间</text>
+          </g>
+          <line x1="400" y1="14" x2="400" y2="268" stroke="#ececef"/>
+          <g transform="translate(438,18)">
+            <text x="0" y="0" font-family="Inter, system-ui, sans-serif" font-size="13" font-weight="600" fill="#4b41d8">改变预算买到的东西</text>
+            <text x="0" y="19" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#8b8b95">有的放矢的修复轮次 · 覆盖全程的学习式摘要</text>
+            <line x1="0" y1="196" x2="350" y2="196" stroke="#e2e2e7"/>
+            <line x1="0" y1="40" x2="0" y2="196" stroke="#e2e2e7"/>
+            <path d="M0 184 C 76 158, 142 124, 210 98 C 268 76, 310 62, 350 52" fill="none" stroke="#4b41d8" stroke-width="2.5"/>
+            <circle cx="350" cy="52" r="4.5" fill="#4b41d8"/>
+            <text x="196" y="140" font-family="Inter, system-ui, sans-serif" font-size="12" fill="#4b41d8">仍在上升</text>
+            <text x="0" y="218" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#8b8b95">预算 →</text>
+            <text x="0" y="242" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#8b8b95">对着测量结果修复 · 压缩记忆</text>
+          </g>
+        </svg>
+        <figcaption>我在两个毫不相干的代码库里都找到的那个形状。先把那个无方向的旋钮扫一遍，在继续加码之前先弄清楚自己是不是已经站在平段上。</figcaption>
+      </figure>
+
+      <div class="callout"><b>无方向的资源加得再多也会饱和；改变预算买到的东西则不会。</b> 更多采样、更长上下文、更多自主性、更多参数——它们都是同一种货币，过了某个点，汇率就归零了。持续有回报的，是把预算换成有结构的东西：一个能指到某一行代码的测量，一份覆盖整段跨度而不是一个切片的摘要。</div>
+
+      <p>我觉得把它当成一条先验非常有用，因为这个领域在效果不及预期时的默认反射，恰恰是把那种已经不再起作用的资源再多花一些。它也很便宜就能验证：先扫那个无方向的旋钮，在加码之前先弄清楚自己是不是已经在平段上。</p>
+
+      <h2 id="inside">把审计放进产物内部</h2>
+
+      <p>命名给你把手。审计则是让这个把手不撒谎的东西——我觉得我在这一块有点不太一样的东西。</p>
+
+      <p>显而易见的设计是让打分器站在外面：智能体改，然后检查器查。对一次编辑来说这没问题。它垮在累积上——因为程序不是只被编辑一次，而是一遍又一遍地被编辑，每一轮都是一次机会，可以悄悄丢掉一条当下没人盯着的保证。整文件重写是极端情形，而它为什么这么糟糕，值得说准确：<b>一份被整体重述的文件没有历史。</b>早先的编辑所立下的保证，只以文件里的若干行存在，而重述可以毫无声息地把它们省掉，产生的 diff 又大到没有人读得完。</p>
+
+      <p>所以每一次编辑都往程序里追加它自己的审计——一条断言，声明它刚做的改动依然成立——并且这条审计被接进驱动器<em>在仿真内部</em>运行的收益函数里。一次违反了早先保证的后续编辑，不会「得分很低」。<b>它根本烘焙不出来。</b>而把审计删掉的那一种，会因为按名字点名时缺席而暴露。程序自己携带着它自身历史的回归测试集，由编辑过它的那些智能体写下。</p>
+
+      <p>我最喜欢的一个演示，是一次「合法却失败」的编辑：在已经装了两条审计的情况下，把某个箱子的质量从 26 改成 26000 是一次形式完全正确的改动，而烘焙会带着 <code>AssertionError: crate_02 barely moved</code> 死掉——那正是更早的、与之无关的一次编辑所买下的保证。</p>
+
+      <figure class="plain">
+        <svg viewBox="0 0 820 268" role="img" aria-label="一个程序被编辑三次。每次编辑都追加一条在仿真内部运行的审计。第三次编辑是合法的，但违反了第一次编辑立下的保证，于是烘焙直接失败，而不是得分很低。">
+          <defs>
+            <marker id="a3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#c2412d"/></marker>
+          </defs>
+          <line x1="14" y1="58" x2="806" y2="58" stroke="#ececef"/>
+
+          <circle cx="104" cy="58" r="6" fill="#4b41d8"/>
+          <text x="104" y="34" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="13" font-weight="600" fill="#16161a">编辑 1</text>
+          <text x="104" y="86" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="12" fill="#8b8b95">把箱子变重</text>
+          <rect x="12" y="100" width="184" height="32" rx="7" fill="#fff" stroke="#4b41d8"/>
+          <text x="104" y="121" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="10.5" fill="#4b41d8">assert crate_02 moves</text>
+
+          <circle cx="330" cy="58" r="6" fill="#4b41d8"/>
+          <text x="330" y="34" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="13" font-weight="600" fill="#16161a">编辑 2</text>
+          <text x="330" y="86" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="12" fill="#8b8b95">重新上色、重新取景</text>
+          <rect x="238" y="100" width="184" height="32" rx="7" fill="#fff" stroke="#4b41d8"/>
+          <text x="330" y="121" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="10.5" fill="#4b41d8">assert bake identical</text>
+
+          <circle cx="600" cy="58" r="6" fill="#c2412d"/>
+          <text x="600" y="34" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="13" font-weight="600" fill="#c2412d">编辑 3</text>
+          <text x="600" y="86" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="12" fill="#8b8b95">质量 26 → 26000</text>
+          <text x="600" y="103" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#8b8b95">一次完全合法的改动</text>
+          <path d="M600 112 L600 134" stroke="#c2412d" marker-end="url(#a3)"/>
+          <rect x="494" y="140" width="212" height="42" rx="8" fill="#fdf1ef" stroke="#c2412d"/>
+          <text x="600" y="158" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="10.5" fill="#c2412d">AssertionError:</text>
+          <text x="600" y="174" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="10.5" fill="#c2412d">crate_02 barely moved</text>
+
+          <path d="M104 132 C 104 196, 400 196, 492 168" fill="none" stroke="#c2412d" stroke-dasharray="4 4" opacity="0.8"/>
+          <text x="150" y="212" font-family="Inter, system-ui, sans-serif" font-size="12" fill="#c2412d">拦下编辑 3 的，是编辑 1 立下的保证</text>
+
+          <line x1="0" y1="232" x2="820" y2="232" stroke="#ececef"/>
+          <text x="0" y="256" font-family="Inter, system-ui, sans-serif" font-size="12" fill="#16161a" font-weight="600">它不是得分低——它根本烘焙不出来。</text>
+          <text x="322" y="256" font-family="Inter, system-ui, sans-serif" font-size="12" fill="#8b8b95">审计跑在仿真内部，而不是仿真旁边。</text>
+        </svg>
+        <figcaption>把编辑看成累积：每一次编辑都留下一条断言，后来的编辑必须活过它，于是程序自己携带了它历史的回归测试集。</figcaption>
+      </figure>
+
+      <p>同一种直觉还有两处体现，都是关于拒绝相信智能体自己的说法：</p>
+
+      <ul>
+        <li><b>代价等级是从 diff 里读出来的，绝不采信智能体自己的描述。</b>一个嘴上报告「只改外观」、手上却动了质量的智能体，会被机械地抓住。而外观类和相机类的编辑拿到的是精确不变量，不是容差：物理烘焙必须逐比特相同地回来——只要有任何东西动过，这一条就平凡地为假。</li>
+        <li><b>先查真实性，再查有效性。</b>一次什么都没改就宣布成功、或者压根没有重新烘焙的运行，会继承上一次的产物，然后在其他每一个维度上拿满分。所以第一个问题是：程序是否真的不一样了，场景是否是在这次运行开始之后才写出来的。一切判定都针对磁盘上的产物，绝不针对对话记录。</li>
+      </ul>
+
+      <p>在横跨十个类别的 127 条编辑请求上，锚定补丁的做法完成了被要求改动的 90%，同时保住了 100% 的场景物体身份，其中 123 条没有扰动到目标因果可达范围之外的任何东西。从头重新生成——也就是视频模型逼着你做的那件事——只完成了 62%，身份只保住 9%。这个 9% 是我会放上幻灯片的数字。它就是没有名字的代价。</p>
+
+      <figure class="plain">
+        <svg viewBox="0 0 780 190" role="img" aria-label="在 127 条编辑请求上：锚定补丁达成 90% 的有效性并保住 100% 的物体身份；从头重新生成达成 62% 的有效性，只保住 9% 的身份。">
+          <text x="0" y="14" font-family="Inter, system-ui, sans-serif" font-size="12" fill="#8b8b95">127 条编辑请求，十个类别</text>
+
+          <text x="0" y="52" font-family="Inter, system-ui, sans-serif" font-size="12.5" fill="#8b8b95">要求的改动发生了吗</text>
+          <text x="300" y="52" font-family="Inter, system-ui, sans-serif" font-size="12.5" font-weight="600" fill="#16161a">锚定补丁</text>
+          <rect x="300" y="60" width="324" height="20" rx="3" fill="#ececef"/>
+          <rect x="300" y="60" width="292" height="20" rx="3" fill="#4b41d8"/>
+          <text x="634" y="75" font-family="Inter, system-ui, sans-serif" font-size="12.5" font-weight="600" fill="#4b41d8">90%</text>
+          <text x="300" y="104" font-family="Inter, system-ui, sans-serif" font-size="12.5" fill="#8b8b95">从头重新生成</text>
+          <rect x="300" y="112" width="324" height="20" rx="3" fill="#ececef"/>
+          <rect x="300" y="112" width="201" height="20" rx="3" fill="#a8a8b4"/>
+          <text x="634" y="127" font-family="Inter, system-ui, sans-serif" font-size="12.5" fill="#8b8b95">62%</text>
+
+          <line x1="0" y1="152" x2="780" y2="152" stroke="#ececef"/>
+          <text x="0" y="178" font-family="Inter, system-ui, sans-serif" font-size="12.5" fill="#8b8b95">保住的物体身份</text>
+          <text x="300" y="178" font-family="Inter, system-ui, sans-serif" font-size="14" font-weight="600" fill="#4b41d8">100%</text>
+          <text x="400" y="178" font-family="Inter, system-ui, sans-serif" font-size="12.5" fill="#8b8b95">对比</text>
+          <text x="470" y="178" font-family="Inter, system-ui, sans-serif" font-size="14" font-weight="600" fill="#c2412d">9%</text>
+          <text x="512" y="178" font-family="Inter, system-ui, sans-serif" font-size="12.5" fill="#8b8b95">——没有名字的代价</text>
+        </svg>
+        <figcaption>有效性是所有人都会测的那一半。身份则是只有当物体拥有名字时才存在的那一半。</figcaption>
+      </figure>
+
+      <p>有一个设计细节我很喜欢：附带损害只沿着<em>真正发生了改变</em>的刚体传播。单纯按邻近传播会是空洞的，因为地面和一切都接触，经地板一跳就够到了整个场景，于是没有任何东西还能算作附带损害。</p>
+
+      <figure class="plain">
+        <svg viewBox="0 0 780 200" role="img" aria-label="左：如果附带损害按邻近传播，地面与一切接触，于是整个场景都算可达，什么都不可能成为附带损害。右：只经由真正移动过的刚体传播，可达集合就小而有意义。">
+          <text x="0" y="14" font-family="Inter, system-ui, sans-serif" font-size="12.5" font-weight="600" fill="#c2412d">按邻近传播——空洞</text>
+          <text x="420" y="14" font-family="Inter, system-ui, sans-serif" font-size="12.5" font-weight="600" fill="#4b41d8">只经由动过的刚体</text>
+          <g>
+            <rect x="0" y="150" width="330" height="12" rx="3" fill="#f2c9c2"/>
+            <text x="0" y="180" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#8b8b95">地面与一切都接触</text>
+            <circle cx="52" cy="120" r="14" fill="#f2c9c2"/><circle cx="110" cy="120" r="14" fill="#f2c9c2"/>
+            <circle cx="168" cy="120" r="14" fill="#c2412d"/><circle cx="226" cy="120" r="14" fill="#f2c9c2"/>
+            <circle cx="284" cy="120" r="14" fill="#f2c9c2"/>
+            <circle cx="81" cy="78" r="14" fill="#f2c9c2"/><circle cx="197" cy="78" r="14" fill="#f2c9c2"/>
+            <circle cx="255" cy="78" r="14" fill="#f2c9c2"/>
+            <text x="168" y="48" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#c2412d">经地板一跳</text>
+            <text x="168" y="64" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#c2412d">就够到整个场景</text>
+          </g>
+          <line x1="375" y1="20" x2="375" y2="185" stroke="#ececef"/>
+          <g transform="translate(420,0)">
+            <rect x="0" y="150" width="330" height="12" rx="3" fill="#ececef"/>
+            <text x="0" y="180" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#8b8b95">没变过的刚体不导通</text>
+            <circle cx="52" cy="120" r="14" fill="#ececef"/><circle cx="110" cy="120" r="14" fill="#ececef"/>
+            <circle cx="168" cy="120" r="14" fill="#4b41d8"/><circle cx="226" cy="120" r="14" fill="#bcb7f0"/>
+            <circle cx="284" cy="120" r="14" fill="#ececef"/>
+            <circle cx="81" cy="78" r="14" fill="#ececef"/><circle cx="197" cy="78" r="14" fill="#bcb7f0"/>
+            <circle cx="255" cy="78" r="14" fill="#ececef"/>
+            <text x="168" y="48" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#4b41d8">目标，以及它真正</text>
+            <text x="168" y="64" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#4b41d8">扰动到的那些</text>
+          </g>
+        </svg>
+        <figcaption>一个永远不可能触发的边界检查，不是边界检查。因果可达必须经由「改变」传播，而不是经由「接触」。</figcaption>
+      </figure>
+
+      <h2 id="discriminate">不会失败的检查器不是检查器</h2>
+
+      <p>如果审计本身就是贡献，那么审计就需要它自己的证据——这是我最希望被拿来评判的一条纪律。</p>
+
+      <p>我交付的每一个检查，都配一个专门设计来让它失败的对照（control）。资产尺度检查问的是智能体建出的刚体是否具有可信的真实世界尺寸；对照把目录里每一个尺寸乘以十，这个检查就掉到零并判失败。也正因为如此，它通过时的分数才有意义。同样的直觉也用在别处：打乱图像的对照，是往返链路那项工作里唯一能说明阅读器用的是<em>这一张</em>图、而不是它的语言先验的数字；而冻结帧基线应当摆在每一个一致性数字旁边，因为那才是天花板。</p>
+
+      <p>还有两个习惯，都是被烫过之后长出来的：</p>
+
+      <ul>
+        <li><b>阈值是推导出来的，绝不是写死的。</b>它们来自场景自己的相机和解码器的步幅，所以同一条意图在 2 m 处和 20 m 处的严苛程度是一样的。配置文件里的一个常数，就是一个在这两个距离中的某一个上必定错误的阈值。</li>
+        <li><b>如果一个数字分不开两个类别，它就没有资格下判决。</b>我曾有一个身份度量，「同一个人」和「不同的人」两个区间在大部分宽度上是重叠的。那里根本不存在好的阈值——不是选得差，是压根没有。所以它只被报告，永远不下判决；判决交给产物本身，在一个人可以当众判错的规模上做。</li>
+      </ul>
+
+      <p>这件事有一个版本只是严谨，另一个版本则是设计原则。设计原则是：<b>把验证做得足够便宜，便宜到它可以跑在昂贵的那一步之前。</b>我的测量框架判的是几何，不是像素——不渲染、不编码、不生成视频——所以一次判定的代价是毫秒级，对面是四十五分钟的 GPU。正因为如此，一个覆盖数百条意图的四组基准在成本上才可行；也正因为如此，修复才发生在渲染之前而不是之后。</p>
+
+      <figure class="plain">
+        <svg viewBox="0 0 780 176" role="img" aria-label="判定几何的代价是毫秒级，发生在渲染之前；判定渲染出的视频要花大约四十五分钟 GPU 时间，发生在之后。">
+          <text x="0" y="14" font-family="Inter, system-ui, sans-serif" font-size="12" fill="#8b8b95">检查放在哪里，代价是多少</text>
+          <rect x="0" y="36" width="150" height="44" rx="8" fill="#fff" stroke="#e2e2e7"/>
+          <text x="75" y="63" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="13" fill="#33333b">写程序</text>
+          <rect x="170" y="36" width="150" height="44" rx="8" fill="#eeecfb" stroke="#4b41d8"/>
+          <text x="245" y="57" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="13" font-weight="600" fill="#4b41d8">判定几何</text>
+          <text x="245" y="73" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#4b41d8">毫秒级</text>
+          <rect x="340" y="36" width="150" height="44" rx="8" fill="#f6f6f8" stroke="#e2e2e7"/>
+          <text x="415" y="57" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="13" fill="#33333b">渲染</text>
+          <text x="415" y="73" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#8b8b95">~45 min GPU</text>
+          <rect x="510" y="36" width="150" height="44" rx="8" fill="#fff" stroke="#e2e2e7"/>
+          <text x="585" y="63" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="13" fill="#33333b">视频</text>
+          <path d="M245 84 C 245 116, 75 116, 75 90" fill="none" stroke="#4b41d8" stroke-dasharray="4 4"/>
+          <text x="96" y="130" font-family="Inter, system-ui, sans-serif" font-size="12" fill="#4b41d8">修复在这里发生，几乎免费</text>
+          <text x="0" y="166" font-family="Inter, system-ui, sans-serif" font-size="12" fill="#8b8b95">只能在昂贵步骤之后才跑的检查器，是事后验尸，不是循环。</text>
+        </svg>
+        <figcaption>便宜的验证不是锦上添花。它是修复循环之所以能存在的原因。</figcaption>
+      </figure>
+
+      <h2 id="buys">更大的模型买不到的东西</h2>
+
+      <p>四样靠扩规模拿不到的东西。</p>
+
+      <p><b>任何数据集里都不存在的条件信号。</b>一旦刚体有了名字和轨迹，你就可以画出没有任何相机、也没有任何渲染通道会产出的表示：一个刚体<em>去过哪里</em>，画成一条衰减的拖影，于是单帧就携带了它自己的近期历史；哪一块剪影在前面，同时把度量距离扔掉；只画接触斑块，画在刚体真正相触的位置；把接触事件排成一张滚动的栅格图，一个刚体一行、一帧一列，于是时间变成了模型可读的一个空间轴。没有哪个 AOV 叫「这个刚体去过哪里」。这些都是一个具名状态的投影，而我那二十来种先验形式里，大约有九种在已发表的控制类文献中找不到对应物。</p>
+
+      <p><b>一个属性变成了旋钮。</b>在长视频那项工作里，每个基线都待在「一致性 对 动态性」这个平面上的一个固定点上，而这个点是被它的机制钉死的——一个静止不动的系统，并不是「选择」了静止。换一种花预算的方式，得到的是在这个平面上张开的一条可控前沿。有意思的主张不是「我们分数更高」，而是这个轴不再是继承来的。</p>
+
+      <p><b>真值变成免费的。</b>四样里最被低估的一样。如果由模拟器持有应用状态，那么每一个光标目标、每一次字段编辑、每一条记录最终落进哪个桶，都是精确的，而且不花一分钱——正是这一点，把深度推理评测从猜测变成了算术。在这个基础上，我生成了一百段不间断的十分钟会话，大约 16.7 小时、39,478 个动作，以及大约 1,900 个问题，它们的难度和推理类型是<em>按构造</em>指定的，而不是靠标注：计数、状态跟踪、长程状态、因果、时序、状态上的算术。没有人标注过其中任何一条。也没有人标得动。</p>
+
+      <p><b>失败知识会复利。</b>失败模式库不是躺在 wiki 里、需要有人先认出情境才用得上的散文；它被机械化成了直接跑在产物上的检测器。而智能体自己的技能文档从空白开始，完全由它从自己的经历里写出来，合并操作只做新增或细化——一条格式错误、解析出零个技能的回复，会让文档原封不动，于是学习只能往前走。检索时先按机制排序、再按尺度，依据是：翻倒就是翻倒，多大都一样。</p>
+
+      <p>还有一个我没料到的相关发现，也是这一节不只是架构问题的原因：测量框架必须是<b>推给它的，而不是摆在那里等它取的</b>。当它只是一个可选工具时，智能体在一整次运行里调用了零次，闭着眼睛重写代码。现在它在每次烘焙之后不请自来地出现在观测里。一个需要「记得去看」的智能体，就是一个没有测量框架的智能体——我怀疑这一条能推广到远超我这个设定的地方。</p>
+
+      <h2 id="dont">我还没有证明的事</h2>
+
+      <p>上面那些之所以值得信，是因为我一直维护着这份清单——那就把它放在这里。</p>
+
+      <p>闭环<b>尚未渲染</b>。我手上有配对样本：同一条意图下，一组的程序通过了几何判定，另一组的程序没通过，下游一切保持完全一致——同样的种子、同样的步数、逐字节相同的 prompt 文件，且只由意图本身生成，所以两半都不会被自己的描述美化。这些配对里，两半视频都落到磁盘上的，一个也没有。在它们落盘之前，「更好的程序会带来更好的视频」是一个设计，不是一个结果——我在页面上就是这么写的。</p>
+
+      <p>那些新先验<b>被验证过，但还没有被消费</b>。九种自创表示，四种已经栅格化成条件视频，还没有一种真的过了视频模型。所以「条件形式是一个自由变量」这个主张，目前站在三种形式上，而不是二十多种。一个递不到模型手里的先验，是一个指标，不是一条条件通道。</p>
+
+      <p>智能体的对比只有<b>十二条意图</b>，不是整个意图库。质量合理性在当前的烘焙里其实无法测量，而且是静默地无法测量，所以它被报告为跳过，而不是通过。判定器读的是几何，因此看不出一个箱子长不长得像箱子，也看不出扬起的尘土能不能读得出来——而我另有一个消融实验（ablation）表明这些确实要紧。网格里只有一个视频模型，所以「约束来自模型」这句话，只在恰好一个解码器的几何上得到了演示。</p>
+
+      <p>而在长视频那项工作里，对我最强的那张表最诚实的说法是：一个冻结的 rollout 就能赢下来的一致性数字，不是我有资格拿来邀功的数字。</p>
+
+      <h2 id="next">我想把它推向哪里</h2>
+
+      <p>三个系统对「缺什么」的看法是一致的：上面这一切，仍然依赖一个人注意到某个数字。而那些约束是可以推导的——相机、分辨率和解码器的步幅给你可表示性的下限；引擎的配置给你接触容差；程序本身已经声明了哪些刚体必须动、以什么顺序动。这条链上没有任何一环需要品味。所以我想造的是一个规划器：它从「最终会消费它的那个东西」的约束出发，反推几何应有的尺度，而不是先造出一个物理上合理的场景，事后才发现它掉在下限之下。</p>
+
+      <p>更大的那个版本，也是我一直在做这个技术栈里不光鲜那一半的原因：我不认为有意思的前沿是一个更少幻觉的模型。它应该是这样一个系统——一个主张可以被挂到一个产物上，并由某个生成器控制不了的东西来检验。把模型冻住。给状态命名。把预算固定下来，然后去争论它买到了什么。把审计放进被审计的那个东西内部，并且给每一个检查器配一个能让它失败的对照。</p>
+
+      <p>这是一个想法，而我现在已经把它造了三遍。</p>
+
+      <div class="post-foot">
+        <a href="../index.zh.html#writing">← 全部文章</a>
+        <a href="metrics-that-lie.html">下一篇：我的指标骗了我四次 →</a>
+      </div>
+    </article>
+
+    <script>
+      const tb = document.getElementById("topbar");
+      addEventListener("scroll", () => tb.classList.toggle("scrolled", scrollY > 8), { passive: true });
+      const links = [...document.querySelectorAll(".toc a")];
+      const ids = links.map((a) => a.getAttribute("href").slice(1));
+      const spy = new IntersectionObserver((es) => {
+        es.forEach((e) => { if (e.isIntersecting) {
+          links.forEach((l) => l.classList.remove("active"));
+          const a = links.find((l) => l.getAttribute("href") === "#" + e.target.id);
+          if (a) a.classList.add("active");
+        }});
+      }, { rootMargin: "-70px 0px -70% 0px" });
+      ids.forEach((id) => { const el = document.getElementById(id); if (el) spy.observe(el); });
+    </script>
+  </body>
+</html>

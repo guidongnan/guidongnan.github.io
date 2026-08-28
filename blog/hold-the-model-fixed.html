@@ -1,0 +1,466 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <title>Hold the model fixed · Dongnan Gui</title>
+    <meta name="description" content="Three systems, one move: put a named, budgeted, auditable state upstream of a generator that has none. Why controllability, long-horizon consistency and evaluation are the same problem, and the law I ended up proving twice in two unrelated codebases." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;450;500;600&family=JetBrains+Mono:wght@400;500&family=Noto+Serif+SC:wght@500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="blog.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" />
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"
+      onload="renderMathInElement(document.body,{delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}],throwOnError:false})"></script>
+  </head>
+  <body>
+    <header class="topbar" id="topbar">
+      <a class="home" href="../index.html">Dongnan Gui</a>
+      <a href="../index.html#writing">← All writing</a>
+      <a href="hold-the-model-fixed.zh.html">中文</a>
+    </header>
+
+    <nav class="toc" id="toc">
+      <div class="toc-h">Contents</div>
+      <a href="#name">Nothing in there has a name</a>
+      <a href="#move">The move</a>
+      <a href="#law">The law I proved twice by accident</a>
+      <a href="#inside">Put the audit inside the artefact</a>
+      <a href="#discriminate">A checker that cannot fail is not a checker</a>
+      <a href="#buys">What this buys that a bigger model does not</a>
+      <a href="#dont">What I have not shown</a>
+      <a href="#next">Where I would take it</a>
+    </nav>
+
+    <article>
+      <div class="post-head">
+        <div class="kicker">Essay</div>
+        <h1>Hold the model fixed</h1>
+        <div class="meta">
+          <span>August 2026</span><span class="dot"></span>
+          <span>~16 min</span><span class="dot"></span>
+          <span>generative video · agents · accountability</span>
+        </div>
+      </div>
+
+      <p class="lead">I have spent this year building three systems that look unrelated: a memory for long video generation, an agent that writes physics programs to drive a frozen video model, and a paragraph-to-image-to-text round trip. Writing them up, I noticed they are the same system three times. Each one takes something a generative model treats as an unaddressable fluid, and gives it a name, a budget, and an auditor. I want to argue that this is not a stylistic preference. It is the load-bearing move, and the field mostly spends its money on the other one.</p>
+
+      <p>Some of this is under anonymous review, so the long-video work appears here without its name or its numbers. That costs less than you would think, because the part worth arguing about is structural.</p>
+
+      <h2 id="name">Nothing in there has a name</h2>
+
+      <p>Start with the concrete failure. Ask a video model to make the third crate heavier. There is no move available except a new seed — and a new seed changes every object, every frame, every material, because the model holds no persistent identity for the crate. There is no crate. There is a distribution over pixels that has, this time, arranged itself crate-wise.</p>
+
+      <p>Once you say it that way, four problems the field treats as separate collapse into one:</p>
+
+      <figure class="plain">
+        <svg viewBox="0 0 820 330" role="img" aria-label="Top: a request goes into an opaque distribution and out comes video, with no addressable parts. Bottom: a request becomes a program with named symbols, which emits a prior that a frozen model renders, so a single symbol can be patched.">
+          <defs>
+            <marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#8b8b95"/></marker>
+          </defs>
+          <text x="0" y="14" font-family="Inter, system-ui, sans-serif" font-size="12" font-weight="600" fill="#8b8b95" letter-spacing="1.4">TODAY</text>
+          <rect x="0" y="32" width="92" height="50" rx="9" fill="#fff" stroke="#e2e2e7"/>
+          <text x="46" y="62" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="13" fill="#33333b">request</text>
+          <line x1="98" y1="57" x2="118" y2="57" stroke="#8b8b95" marker-end="url(#a1)"/>
+          <rect x="124" y="24" width="196" height="66" rx="12" fill="#f6f6f8" stroke="#e2e2e7" stroke-dasharray="5 4"/>
+          <text x="222" y="51" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="13" fill="#33333b">a distribution over pixels</text>
+          <text x="222" y="71" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="12" fill="#8b8b95">no part of it has a name</text>
+          <line x1="326" y1="57" x2="346" y2="57" stroke="#8b8b95" marker-end="url(#a1)"/>
+          <rect x="352" y="32" width="84" height="50" rx="9" fill="#fff" stroke="#e2e2e7"/>
+          <text x="394" y="62" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="13" fill="#33333b">video</text>
+          <text x="470" y="46" font-family="Inter, system-ui, sans-serif" font-size="12.5" fill="#c2412d">“make the third crate heavier”</text>
+          <text x="470" y="66" font-family="Inter, system-ui, sans-serif" font-size="12.5" fill="#8b8b95">→ the only move is a new seed</text>
+          <text x="470" y="84" font-family="Inter, system-ui, sans-serif" font-size="12.5" fill="#8b8b95">→ every object and frame changes</text>
+
+          <line x1="0" y1="128" x2="820" y2="128" stroke="#ececef"/>
+
+          <text x="0" y="164" font-family="Inter, system-ui, sans-serif" font-size="12" font-weight="600" fill="#4b41d8" letter-spacing="1.4">WITH A NAMED STATE UPSTREAM</text>
+          <rect x="0" y="184" width="92" height="50" rx="9" fill="#fff" stroke="#e2e2e7"/>
+          <text x="46" y="214" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="13" fill="#33333b">request</text>
+          <line x1="98" y1="209" x2="118" y2="209" stroke="#8b8b95" marker-end="url(#a1)"/>
+          <rect x="124" y="172" width="156" height="74" rx="10" fill="#fff" stroke="#4b41d8"/>
+          <text x="202" y="192" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="13" fill="#16161a" font-weight="600">program</text>
+          <text x="202" y="212" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="11" fill="#4b41d8">crate_02 · hammer</text>
+          <text x="202" y="230" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="11" fill="#4b41d8">pivot · camera</text>
+          <line x1="286" y1="209" x2="306" y2="209" stroke="#8b8b95" marker-end="url(#a1)"/>
+          <rect x="312" y="184" width="84" height="50" rx="9" fill="#fff" stroke="#e2e2e7"/>
+          <text x="354" y="214" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="13" fill="#33333b">prior</text>
+          <line x1="402" y1="209" x2="422" y2="209" stroke="#8b8b95" marker-end="url(#a1)"/>
+          <rect x="428" y="184" width="116" height="50" rx="9" fill="#f6f6f8" stroke="#e2e2e7"/>
+          <text x="486" y="207" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="13" fill="#33333b">frozen model</text>
+          <text x="486" y="224" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="11" fill="#8b8b95">never trained</text>
+          <line x1="550" y1="209" x2="570" y2="209" stroke="#8b8b95" marker-end="url(#a1)"/>
+          <rect x="576" y="184" width="84" height="50" rx="9" fill="#fff" stroke="#e2e2e7"/>
+          <text x="618" y="214" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="13" fill="#33333b">video</text>
+          <text x="0" y="282" font-family="JetBrains Mono, monospace" font-size="11.5" fill="#4b41d8">crate_02.mass × 3</text>
+          <text x="152" y="282" font-family="Inter, system-ui, sans-serif" font-size="12.5" fill="#8b8b95">→ a patch, aimed at one symbol</text>
+          <text x="392" y="282" font-family="Inter, system-ui, sans-serif" font-size="12.5" fill="#8b8b95">→ everything else provably intact</text>
+          <text x="0" y="314" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#8b8b95">The generator is identical in both rows. The only difference is whether anything upstream of it has a name.</text>
+        </svg>
+        <figcaption>The whole argument in one picture. A generator has no referent, so the smallest possible edit is a total regeneration. Put a program upstream and the crate has a name again.</figcaption>
+      </figure>
+
+      <ul>
+        <li><b>You cannot edit</b>, because there is no handle to grab. So the only available operation is resampling, and resampling cannot repair a causal inversion — none of the five drafts contains the fix.</li>
+        <li><b>You cannot verify</b>, because the output carries no proposition. So we fall back on distributional metrics, which measure typicality, and typicality is <a href="metrics-that-lie.html#one">maximised by doing nothing</a>.</li>
+        <li><b>You cannot remember</b>, because there is no slot to write to. So identity drifts, and the field's workaround is to re-read a verbatim slice of the past.</li>
+        <li><b>You cannot ground</b>, because there is nothing for evidence to attach to. So a fluent model invents specifics in the source's own vocabulary and scores well for it.</li>
+      </ul>
+
+      <p>Controllability, evaluation, long-horizon consistency, hallucination. Four communities, four benchmark suites. One missing thing: reference.</p>
+
+      <figure class="plain">
+        <svg viewBox="0 0 780 210" role="img" aria-label="Four separate research problems - cannot edit, cannot verify, cannot remember, cannot ground - all trace back to one cause: nothing has a name.">
+          <defs>
+            <marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#c9c9d1"/></marker>
+          </defs>
+          <rect x="0" y="6" width="210" height="40" rx="8" fill="#fff" stroke="#e2e2e7"/>
+          <text x="16" y="31" font-family="Inter, system-ui, sans-serif" font-size="13.5" fill="#33333b">cannot <tspan font-weight="600" fill="#16161a">edit</tspan> — no handle</text>
+          <rect x="0" y="56" width="210" height="40" rx="8" fill="#fff" stroke="#e2e2e7"/>
+          <text x="16" y="81" font-family="Inter, system-ui, sans-serif" font-size="13.5" fill="#33333b">cannot <tspan font-weight="600" fill="#16161a">verify</tspan> — no claim</text>
+          <rect x="0" y="106" width="210" height="40" rx="8" fill="#fff" stroke="#e2e2e7"/>
+          <text x="16" y="131" font-family="Inter, system-ui, sans-serif" font-size="13.5" fill="#33333b">cannot <tspan font-weight="600" fill="#16161a">remember</tspan> — no slot</text>
+          <rect x="0" y="156" width="210" height="40" rx="8" fill="#fff" stroke="#e2e2e7"/>
+          <text x="16" y="181" font-family="Inter, system-ui, sans-serif" font-size="13.5" fill="#33333b">cannot <tspan font-weight="600" fill="#16161a">ground</tspan> — no anchor</text>
+          <path d="M214 26 C 300 26, 320 101, 392 101" fill="none" stroke="#c9c9d1" marker-end="url(#a2)"/>
+          <path d="M214 76 C 300 76, 320 101, 392 101" fill="none" stroke="#c9c9d1" marker-end="url(#a2)"/>
+          <path d="M214 126 C 300 126, 320 101, 392 101" fill="none" stroke="#c9c9d1" marker-end="url(#a2)"/>
+          <path d="M214 176 C 300 176, 320 101, 392 101" fill="none" stroke="#c9c9d1" marker-end="url(#a2)"/>
+          <rect x="400" y="76" width="200" height="50" rx="10" fill="#4b41d8"/>
+          <text x="500" y="107" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="15" font-weight="600" fill="#fff">nothing has a name</text>
+          <text x="624" y="96" font-family="Inter, system-ui, sans-serif" font-size="12.5" fill="#8b8b95">four communities,</text>
+          <text x="624" y="114" font-family="Inter, system-ui, sans-serif" font-size="12.5" fill="#8b8b95">one missing thing</text>
+        </svg>
+        <figcaption>Four literatures, four benchmark suites, one cause.</figcaption>
+      </figure>
+
+      <h2 id="move">The move</h2>
+
+      <p>So: hold the generator fixed, and put a named, budgeted, auditable state upstream of it. In all three systems the generative model is frozen or fixed on purpose, and every gradient, every token, every hour of my attention goes into the representation and its audit instead.</p>
+
+      <p>In the agentic video work this is literal. A language model writes a Python program against a narrow physics DSL; a solver bakes it; the bake emits a conditioning signal — depth, or normals, or segmentation, or a contact map — and a frozen video diffusion model renders from that. Nothing fine-tunes the video model. The entire optimisation target is the code. And because the intermediate representation is a program whose objects share names with the bake, the crate is now called <code>crate_02</code> and you can ask about it.</p>
+
+      <p>In the long-video work the same move appears as a budget question. Once you fix the KV budget, the interesting question stops being <em>how much history do I keep</em> and becomes <em>what does this budget buy</em>. Existing systems spend it on verbatim tokens: either the most recent frames, which gives you fidelity with no span, or a frozen slice of the opening, which gives you span that never updates and quietly drags every later frame back toward the first one. The alternative is to spend the same budget on a learned summary of the whole history, hierarchically coarsened so that no era is ever entirely absent and none is frozen.</p>
+
+      <figure class="plain">
+        <svg viewBox="0 0 780 250" role="img" aria-label="Three ways to spend one fixed budget across a history. A recent window covers only the end. A frozen opening slice covers only the start and never updates. A learned hierarchical summary covers the whole span, coarse for old history and fine for recent.">
+          <text x="0" y="12" font-family="Inter, system-ui, sans-serif" font-size="12" fill="#8b8b95">one fixed budget, three ways to spend it</text>
+          <text x="196" y="236" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#8b8b95">first frame</text>
+          <text x="690" y="236" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#8b8b95">now</text>
+          <line x1="196" y1="214" x2="744" y2="214" stroke="#e2e2e7"/>
+
+          <text x="0" y="48" font-family="Inter, system-ui, sans-serif" font-size="13" fill="#33333b">recent window</text>
+          <text x="0" y="66" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#8b8b95">fidelity, no span</text>
+          <rect x="196" y="36" width="548" height="22" rx="3" fill="#f6f6f8"/>
+          <rect x="628" y="36" width="116" height="22" rx="3" fill="#a8a8b4"/>
+
+          <text x="0" y="110" font-family="Inter, system-ui, sans-serif" font-size="13" fill="#33333b">frozen opening</text>
+          <text x="0" y="128" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#8b8b95">span, never updates</text>
+          <rect x="196" y="98" width="548" height="22" rx="3" fill="#f6f6f8"/>
+          <rect x="196" y="98" width="104" height="22" rx="3" fill="#c2412d" opacity="0.7"/>
+          <text x="312" y="114" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#c2412d">drags later frames back toward frame 1</text>
+
+          <text x="0" y="176" font-family="Inter, system-ui, sans-serif" font-size="13" font-weight="600" fill="#16161a">learned summary</text>
+          <text x="0" y="194" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#8b8b95">whole span, coarse→fine</text>
+          <rect x="196" y="164" width="200" height="22" rx="3" fill="#4b41d8" opacity="0.3"/>
+          <rect x="400" y="164" width="140" height="22" rx="3" fill="#4b41d8" opacity="0.45"/>
+          <rect x="544" y="164" width="100" height="22" rx="3" fill="#4b41d8" opacity="0.68"/>
+          <rect x="648" y="164" width="96" height="22" rx="3" fill="#4b41d8"/>
+          <text x="196" y="156" font-family="Inter, system-ui, sans-serif" font-size="11" fill="#8b8b95">coarse, but present</text>
+          <text x="660" y="156" font-family="Inter, system-ui, sans-serif" font-size="11" fill="#8b8b95">fine</text>
+        </svg>
+        <figcaption>Same number of tokens in every row. The question was never how much history to keep; it was what the budget is spent on.</figcaption>
+      </figure>
+
+      <p>In the round-trip work it appears as insisting the intermediate be public. A frozen generator renders a paragraph into an image; a trained reader reads it back. The obvious risk is that the two ends co-adapt into a private code — a steganographic channel that happens to work and means nothing. The check is almost embarrassingly simple: hand the same image to an <em>untrained</em> reader and ask it to describe the picture. It describes it accurately. Whatever is in there is a genuinely readable image, not a cipher shared between a pair.</p>
+
+      <div class="callout"><b>Why "named" is the right word and not "structured".</b> Structure is cheap; plenty of pipelines have a scene graph nobody can address. What matters is that a request from a human — "the third paint tin from the left" — resolves to a symbol that both the program and the artefact agree on. That is what makes an edit a patch instead of a regeneration, and what makes a check a predicate instead of a vibe.</div>
+
+      <h2 id="law">The law I proved twice by accident</h2>
+
+      <p>This is the part I did not plan and would not have believed if I had only seen it once.</p>
+
+      <p><b>In the agent work.</b> I ran four arms on the same intent bank, same model, same system prompt, none of them ever shown the assertions. One-shot baseline passes 27 of 91. Best-of-five sampling — five independent programs, its own verifier picking the winner — passes 30 of 91, which is barely above one-shot and <em>below</em> plain iterative repair at 31. The harness arm, which repairs against constraints derived from how the model consumes the signal, passes 42. The gap concentrates exactly where you would predict: causal-ordering assertions, 21 of 40 for the harness against 7 of 40 for sampling. Five independent attempts cannot fix an inverted chain, because the fix is in none of them.</p>
+
+      <p>Then the sharper version, on a matched 12-intent subset. My autonomous agent, with memory and retrieval and a 14-step budget, spent about three times the tokens of the plain fixed loop — and scored worse, 6 against 7. Nudging it to wrap up sooner made it strictly worse still. Raising the step budget to 24 and changing nothing else took it to 8. More undirected autonomy was negative. More <em>targeted repair rounds</em> was the whole effect.</p>
+
+      <figure class="plain">
+        <svg viewBox="0 0 780 252" role="img" aria-label="Bar chart of four arms. Intents passed out of 91: one shot 27, best-of-5 sampling 30, plain iterate 31, harness 42. Causal ordering assertions out of 40: 9, 7, 19, 21.">
+          <text x="0" y="12" font-family="Inter, system-ui, sans-serif" font-size="12" fill="#8b8b95">intents passed / 91</text>
+          <text x="470" y="12" font-family="Inter, system-ui, sans-serif" font-size="12" fill="#8b8b95">causal ordering / 40</text>
+
+          <text x="0" y="48" font-family="Inter, system-ui, sans-serif" font-size="13" fill="#33333b">one shot</text>
+          <rect x="128" y="34" width="116" height="18" rx="3" fill="#d8d8de"/>
+          <text x="252" y="48" font-family="Inter, system-ui, sans-serif" font-size="12.5" fill="#8b8b95">27</text>
+          <rect x="470" y="34" width="52" height="18" rx="3" fill="#d8d8de"/>
+          <text x="530" y="48" font-family="Inter, system-ui, sans-serif" font-size="12.5" fill="#8b8b95">9</text>
+
+          <text x="0" y="98" font-family="Inter, system-ui, sans-serif" font-size="13" fill="#33333b">best-of-5 sampling</text>
+          <rect x="128" y="84" width="129" height="18" rx="3" fill="#c2412d" opacity="0.7"/>
+          <text x="265" y="98" font-family="Inter, system-ui, sans-serif" font-size="12.5" fill="#8b8b95">30</text>
+          <rect x="470" y="84" width="40" height="18" rx="3" fill="#c2412d" opacity="0.7"/>
+          <text x="518" y="98" font-family="Inter, system-ui, sans-serif" font-size="12.5" fill="#c2412d">7</text>
+
+          <text x="0" y="148" font-family="Inter, system-ui, sans-serif" font-size="13" fill="#33333b">plain iterate</text>
+          <rect x="128" y="134" width="133" height="18" rx="3" fill="#a8a8b4"/>
+          <text x="269" y="148" font-family="Inter, system-ui, sans-serif" font-size="12.5" fill="#8b8b95">31</text>
+          <rect x="470" y="134" width="110" height="18" rx="3" fill="#a8a8b4"/>
+          <text x="588" y="148" font-family="Inter, system-ui, sans-serif" font-size="12.5" fill="#8b8b95">19</text>
+
+          <text x="0" y="198" font-family="Inter, system-ui, sans-serif" font-size="13" font-weight="600" fill="#16161a">harness</text>
+          <rect x="128" y="184" width="180" height="18" rx="3" fill="#4b41d8"/>
+          <text x="316" y="198" font-family="Inter, system-ui, sans-serif" font-size="12.5" font-weight="600" fill="#4b41d8">42</text>
+          <rect x="470" y="184" width="122" height="18" rx="3" fill="#4b41d8"/>
+          <text x="600" y="198" font-family="Inter, system-ui, sans-serif" font-size="12.5" font-weight="600" fill="#4b41d8">21</text>
+
+          <text x="0" y="238" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#8b8b95">Same model, same system prompt, same intents. No arm ever saw the assertions.</text>
+        </svg>
+        <figcaption>Sampling five times and keeping the best lands barely above one shot, and below plain repair. The right-hand column is where the difference actually lives.</figcaption>
+      </figure>
+
+      <p><b>In the memory work.</b> Completely different codebase, different modality, different year of my life. I swept memory capacity against a verbatim KV cache expanded by the same amount. The verbatim cache improves, then flatly saturates — and it saturates precisely at the context length it had been trained to attend to. Giving it more of what it already had bought nothing. The compressed memory, over the same sweep, improved monotonically the whole way.</p>
+
+      <p>Two systems, no shared code, no shared authors beyond me, and the same shape:</p>
+
+      <figure class="plain">
+        <svg viewBox="0 0 820 292" role="img" aria-label="Two panels. Left: adding more of an undirected resource rises then flattens. Right: converting the budget into something structured keeps rising.">
+          <g transform="translate(4,18)">
+            <text x="0" y="0" font-family="Inter, system-ui, sans-serif" font-size="13" font-weight="600" fill="#16161a">More of the same currency</text>
+            <text x="0" y="19" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#8b8b95">more samples · more context · more autonomy</text>
+            <line x1="0" y1="196" x2="350" y2="196" stroke="#e2e2e7"/>
+            <line x1="0" y1="40" x2="0" y2="196" stroke="#e2e2e7"/>
+            <path d="M0 184 C 50 142, 80 102, 126 95 C 200 86, 270 84, 350 83" fill="none" stroke="#8b8b95" stroke-width="2.5"/>
+            <line x1="126" y1="95" x2="126" y2="196" stroke="#c2412d" stroke-width="1" stroke-dasharray="4 4"/>
+            <circle cx="126" cy="95" r="4.5" fill="#c2412d"/>
+            <text x="138" y="126" font-family="Inter, system-ui, sans-serif" font-size="12" fill="#c2412d">saturates here</text>
+            <text x="138" y="143" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#8b8b95">exchange rate → 0</text>
+            <text x="0" y="218" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#8b8b95">budget →</text>
+            <text x="0" y="242" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#8b8b95">best-of-5 sampling · a verbatim cache given more room</text>
+          </g>
+          <line x1="400" y1="14" x2="400" y2="268" stroke="#ececef"/>
+          <g transform="translate(438,18)">
+            <text x="0" y="0" font-family="Inter, system-ui, sans-serif" font-size="13" font-weight="600" fill="#4b41d8">Change what the budget buys</text>
+            <text x="0" y="19" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#8b8b95">targeted repair rounds · a learned summary of the span</text>
+            <line x1="0" y1="196" x2="350" y2="196" stroke="#e2e2e7"/>
+            <line x1="0" y1="40" x2="0" y2="196" stroke="#e2e2e7"/>
+            <path d="M0 184 C 76 158, 142 124, 210 98 C 268 76, 310 62, 350 52" fill="none" stroke="#4b41d8" stroke-width="2.5"/>
+            <circle cx="350" cy="52" r="4.5" fill="#4b41d8"/>
+            <text x="196" y="140" font-family="Inter, system-ui, sans-serif" font-size="12" fill="#4b41d8">still climbing</text>
+            <text x="0" y="218" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#8b8b95">budget →</text>
+            <text x="0" y="242" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#8b8b95">repair against a measurement · compressed memory</text>
+          </g>
+        </svg>
+        <figcaption>The shape I found in two unrelated codebases. Sweep the undirected knob first, and find out whether you are already on the flat part before buying more of it.</figcaption>
+      </figure>
+
+      <div class="callout"><b>Adding more of the undirected resource saturates. Changing what the budget buys does not.</b> More samples, more context, more autonomy, more parameters — these are all the same currency, and past a point the exchange rate goes to zero. What keeps paying is converting the budget into something with structure: a measurement that points at a line of code, a summary that covers a span instead of a slice.</div>
+
+      <p>I find this genuinely useful as a prior, because the default reflex in this field when something underperforms is to spend more of exactly the resource that has already stopped working. It is also cheap to test: sweep the undirected knob first and find out whether you are on the flat part before you buy more of it.</p>
+
+      <h2 id="inside">Put the audit inside the artefact</h2>
+
+      <p>Naming gets you the handle. Auditing is what stops the handle from lying, and this is where I think I have something a bit unusual.</p>
+
+      <p>The obvious design is a scorer standing outside: the agent edits, then a checker inspects. That is fine for one edit. It falls apart under accumulation, because a program is not edited once, it is edited again and again, and every round is a chance to quietly drop a guarantee nobody is currently looking at. Whole-file regeneration is the extreme case, and it is worth being precise about why it is so bad: <b>a file restated in full has no history.</b> The guarantees earlier edits established exist only as lines in it, and a restatement is free to omit them silently, with no diff small enough for anyone to read.</p>
+
+      <p>So each edit appends its own audit to the program — an assertion that the change it just made is still true — and that audit is wired into the payoff function the driver runs <em>inside the simulation</em>. A later edit that violates an earlier guarantee does not score badly. <b>It cannot bake at all.</b> One that deletes the audit is missing by name. The program carries the regression suite for its own history, written by the agents that edited it.</p>
+
+      <p>My favourite demonstration of this is a legal edit that fails: with two audits installed, changing a crate's mass from 26 to 26000 is a perfectly well-formed change, and the bake dies with <code>AssertionError: crate_02 barely moved</code> — the guarantee an earlier, unrelated edit had paid for.</p>
+
+      <figure class="plain">
+        <svg viewBox="0 0 820 268" role="img" aria-label="A program is edited three times. Each edit appends an audit that runs inside the simulation. The third edit is legal but violates the first edit's guarantee, so the bake fails instead of scoring badly.">
+          <defs>
+            <marker id="a3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#c2412d"/></marker>
+          </defs>
+          <line x1="14" y1="58" x2="806" y2="58" stroke="#ececef"/>
+
+          <circle cx="104" cy="58" r="6" fill="#4b41d8"/>
+          <text x="104" y="34" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="13" font-weight="600" fill="#16161a">edit 1</text>
+          <text x="104" y="86" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="12" fill="#8b8b95">heavier crate</text>
+          <rect x="12" y="100" width="184" height="32" rx="7" fill="#fff" stroke="#4b41d8"/>
+          <text x="104" y="121" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="10.5" fill="#4b41d8">assert crate_02 moves</text>
+
+          <circle cx="330" cy="58" r="6" fill="#4b41d8"/>
+          <text x="330" y="34" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="13" font-weight="600" fill="#16161a">edit 2</text>
+          <text x="330" y="86" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="12" fill="#8b8b95">repaint, reframe</text>
+          <rect x="238" y="100" width="184" height="32" rx="7" fill="#fff" stroke="#4b41d8"/>
+          <text x="330" y="121" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="10.5" fill="#4b41d8">assert bake identical</text>
+
+          <circle cx="600" cy="58" r="6" fill="#c2412d"/>
+          <text x="600" y="34" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="13" font-weight="600" fill="#c2412d">edit 3</text>
+          <text x="600" y="86" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="12" fill="#8b8b95">mass 26 → 26000</text>
+          <text x="600" y="103" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#8b8b95">a perfectly legal change</text>
+          <path d="M600 112 L600 134" stroke="#c2412d" marker-end="url(#a3)"/>
+          <rect x="494" y="140" width="212" height="42" rx="8" fill="#fdf1ef" stroke="#c2412d"/>
+          <text x="600" y="158" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="10.5" fill="#c2412d">AssertionError:</text>
+          <text x="600" y="174" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="10.5" fill="#c2412d">crate_02 barely moved</text>
+
+          <path d="M104 132 C 104 196, 400 196, 492 168" fill="none" stroke="#c2412d" stroke-dasharray="4 4" opacity="0.8"/>
+          <text x="150" y="212" font-family="Inter, system-ui, sans-serif" font-size="12" fill="#c2412d">edit 1’s guarantee is what stops edit 3</text>
+
+          <line x1="0" y1="232" x2="820" y2="232" stroke="#ececef"/>
+          <text x="0" y="256" font-family="Inter, system-ui, sans-serif" font-size="12" fill="#16161a" font-weight="600">It does not score badly — it cannot bake at all.</text>
+          <text x="322" y="256" font-family="Inter, system-ui, sans-serif" font-size="12" fill="#8b8b95">The audits run inside the simulation, not beside it.</text>
+        </svg>
+        <figcaption>Editing as accumulation: every edit leaves behind an assertion that later edits must survive, so the program carries the regression suite for its own history.</figcaption>
+      </figure>
+
+      <p>Two more pieces of the same instinct, both about refusing to trust the agent's own account:</p>
+
+      <ul>
+        <li><b>The cost level is read off the diff, never taken from the agent's description.</b> An agent that reports "appearance only" while mutating a mass is caught mechanically. And appearance and camera edits get an exact invariant rather than a tolerance: the physics bake must come back bit-identical, which is trivially false if anything moved.</li>
+        <li><b>Authenticity is checked before validity.</b> A run that announced success without editing anything, or that never re-baked, would inherit the previous artefact and score perfectly on every other axis. So the first question is whether the program actually differs and the scene was written after the run began. Everything is evaluated against artefacts on disk, never against the transcript.</li>
+      </ul>
+
+      <p>Across 127 edit requests spanning ten categories, the anchored-patch approach achieved 90% of what was asked while keeping 100% of scene object identities, and 123 of 127 disturbed nothing outside the causal reach of their target. Regenerating from scratch — the thing a video model forces you to do — achieved 62% and kept 9% of identities. That 9% is the number I would put on a slide. It is the cost of having no names.</p>
+
+      <figure class="plain">
+        <svg viewBox="0 0 780 190" role="img" aria-label="Across 127 edit requests: anchored patch achieves 90 percent validity and keeps 100 percent of object identities; regenerating from scratch achieves 62 percent validity and keeps 9 percent of identities.">
+          <text x="0" y="14" font-family="Inter, system-ui, sans-serif" font-size="12" fill="#8b8b95">127 edit requests, ten categories</text>
+
+          <text x="0" y="52" font-family="Inter, system-ui, sans-serif" font-size="12.5" fill="#8b8b95">did the asked-for change happen</text>
+          <text x="300" y="52" font-family="Inter, system-ui, sans-serif" font-size="12.5" font-weight="600" fill="#16161a">anchored patch</text>
+          <rect x="300" y="60" width="324" height="20" rx="3" fill="#ececef"/>
+          <rect x="300" y="60" width="292" height="20" rx="3" fill="#4b41d8"/>
+          <text x="634" y="75" font-family="Inter, system-ui, sans-serif" font-size="12.5" font-weight="600" fill="#4b41d8">90%</text>
+          <text x="300" y="104" font-family="Inter, system-ui, sans-serif" font-size="12.5" fill="#8b8b95">regenerate from scratch</text>
+          <rect x="300" y="112" width="324" height="20" rx="3" fill="#ececef"/>
+          <rect x="300" y="112" width="201" height="20" rx="3" fill="#a8a8b4"/>
+          <text x="634" y="127" font-family="Inter, system-ui, sans-serif" font-size="12.5" fill="#8b8b95">62%</text>
+
+          <line x1="0" y1="152" x2="780" y2="152" stroke="#ececef"/>
+          <text x="0" y="178" font-family="Inter, system-ui, sans-serif" font-size="12.5" fill="#8b8b95">object identities kept</text>
+          <text x="300" y="178" font-family="Inter, system-ui, sans-serif" font-size="14" font-weight="600" fill="#4b41d8">100%</text>
+          <text x="400" y="178" font-family="Inter, system-ui, sans-serif" font-size="12.5" fill="#8b8b95">against</text>
+          <text x="470" y="178" font-family="Inter, system-ui, sans-serif" font-size="14" font-weight="600" fill="#c2412d">9%</text>
+          <text x="512" y="178" font-family="Inter, system-ui, sans-serif" font-size="12.5" fill="#8b8b95">— the cost of having no names</text>
+        </svg>
+        <figcaption>Validity is the part everyone measures. Identity is the part that only exists if the objects have names.</figcaption>
+      </figure>
+
+      <p>One design detail I am fond of: collateral damage propagates only through bodies that <em>actually changed</em>. Plain proximity would be vacuous, because the ground touches everything, so one hop through the floor reaches the whole scene and nothing could ever count as collateral.</p>
+
+      <figure class="plain">
+        <svg viewBox="0 0 780 200" role="img" aria-label="Left: if collateral damage propagates by proximity, the ground touches everything so the whole scene counts as reachable and nothing can ever be collateral. Right: propagating only through bodies that actually moved leaves a small, meaningful reachable set.">
+          <text x="0" y="14" font-family="Inter, system-ui, sans-serif" font-size="12.5" font-weight="600" fill="#c2412d">by proximity — vacuous</text>
+          <text x="420" y="14" font-family="Inter, system-ui, sans-serif" font-size="12.5" font-weight="600" fill="#4b41d8">through bodies that moved</text>
+          <g>
+            <rect x="0" y="150" width="330" height="12" rx="3" fill="#f2c9c2"/>
+            <text x="0" y="180" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#8b8b95">the ground touches everything</text>
+            <circle cx="52" cy="120" r="14" fill="#f2c9c2"/><circle cx="110" cy="120" r="14" fill="#f2c9c2"/>
+            <circle cx="168" cy="120" r="14" fill="#c2412d"/><circle cx="226" cy="120" r="14" fill="#f2c9c2"/>
+            <circle cx="284" cy="120" r="14" fill="#f2c9c2"/>
+            <circle cx="81" cy="78" r="14" fill="#f2c9c2"/><circle cx="197" cy="78" r="14" fill="#f2c9c2"/>
+            <circle cx="255" cy="78" r="14" fill="#f2c9c2"/>
+            <text x="168" y="48" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#c2412d">one hop through the floor</text>
+            <text x="168" y="64" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#c2412d">reaches the whole scene</text>
+          </g>
+          <line x1="375" y1="20" x2="375" y2="185" stroke="#ececef"/>
+          <g transform="translate(420,0)">
+            <rect x="0" y="150" width="330" height="12" rx="3" fill="#ececef"/>
+            <text x="0" y="180" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#8b8b95">unchanged bodies do not conduct</text>
+            <circle cx="52" cy="120" r="14" fill="#ececef"/><circle cx="110" cy="120" r="14" fill="#ececef"/>
+            <circle cx="168" cy="120" r="14" fill="#4b41d8"/><circle cx="226" cy="120" r="14" fill="#bcb7f0"/>
+            <circle cx="284" cy="120" r="14" fill="#ececef"/>
+            <circle cx="81" cy="78" r="14" fill="#ececef"/><circle cx="197" cy="78" r="14" fill="#bcb7f0"/>
+            <circle cx="255" cy="78" r="14" fill="#ececef"/>
+            <text x="168" y="48" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#4b41d8">the target, and only what</text>
+            <text x="168" y="64" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#4b41d8">it actually disturbed</text>
+          </g>
+        </svg>
+        <figcaption>A containment check that can never fire is not a containment check. Causal reach has to propagate through change, not through contact.</figcaption>
+      </figure>
+
+      <h2 id="discriminate">A checker that cannot fail is not a checker</h2>
+
+      <p>If the audit is the contribution, then the audit needs its own evidence, and this is the discipline I would most want to be judged on.</p>
+
+      <p>Every check I ship gets a control designed to make it fail. The asset-scale check asks whether the agent's bodies have plausible real-world dimensions; the control multiplies every catalogue dimension by ten, and the check drops to zero and fails. That is the only reason the passing score means anything. Same instinct elsewhere: a shuffled-image control is the only number in the round-trip work that shows the reader is using <em>this</em> image rather than its language prior; a frozen-frame baseline belongs next to every consistency number, because it is the ceiling.</p>
+
+      <p>Two more habits that came out of being burned:</p>
+
+      <ul>
+        <li><b>Thresholds are derived, never written down.</b> They come from the scene's own camera and the decoder's stride, so the same intent is equally demanding at 2 m and at 20 m. A constant in a config file is a threshold that is wrong at one of those distances.</li>
+        <li><b>If a number cannot separate two classes, it does not get to judge.</b> I had an identity metric whose "same person" and "different person" ranges overlapped across most of their width. There is no good threshold there — not a badly chosen one, none. So it gets reported and never gets a verdict, and the verdict happens on the artefact at a size where a human can be wrong in public.</li>
+      </ul>
+
+      <p>There is a version of this that is just rigour, and a version that is a design principle. The design principle is: <b>make the verification cheap enough that it can run before the expensive thing.</b> My harness judges geometry, not pixels — no render, no encode, no generated video — so a judgement costs milliseconds against forty-five minutes of GPU. That is the only reason a four-arm benchmark over hundreds of intents is affordable at all, and the only reason repair happens before the render rather than after it.</p>
+
+      <figure class="plain">
+        <svg viewBox="0 0 780 176" role="img" aria-label="Judging geometry costs milliseconds and happens before rendering; judging the rendered video costs about forty-five minutes of GPU time and happens after.">
+          <text x="0" y="14" font-family="Inter, system-ui, sans-serif" font-size="12" fill="#8b8b95">where the check sits, and what it costs</text>
+          <rect x="0" y="36" width="150" height="44" rx="8" fill="#fff" stroke="#e2e2e7"/>
+          <text x="75" y="63" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="13" fill="#33333b">write program</text>
+          <rect x="170" y="36" width="150" height="44" rx="8" fill="#eeecfb" stroke="#4b41d8"/>
+          <text x="245" y="57" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="13" font-weight="600" fill="#4b41d8">judge geometry</text>
+          <text x="245" y="73" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#4b41d8">milliseconds</text>
+          <rect x="340" y="36" width="150" height="44" rx="8" fill="#f6f6f8" stroke="#e2e2e7"/>
+          <text x="415" y="57" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="13" fill="#33333b">render</text>
+          <text x="415" y="73" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#8b8b95">~45 min GPU</text>
+          <rect x="510" y="36" width="150" height="44" rx="8" fill="#fff" stroke="#e2e2e7"/>
+          <text x="585" y="63" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="13" fill="#33333b">video</text>
+          <path d="M245 84 C 245 116, 75 116, 75 90" fill="none" stroke="#4b41d8" stroke-dasharray="4 4"/>
+          <text x="96" y="130" font-family="Inter, system-ui, sans-serif" font-size="12" fill="#4b41d8">repair happens here, for free</text>
+          <text x="0" y="166" font-family="Inter, system-ui, sans-serif" font-size="12" fill="#8b8b95">A checker that can only run after the expensive step is a post-mortem, not a loop.</text>
+        </svg>
+        <figcaption>Cheap verification is not a nicety. It is what makes the repair loop exist at all.</figcaption>
+      </figure>
+
+      <h2 id="buys">What this buys that a bigger model does not</h2>
+
+      <p>Four things I could not have got by scaling.</p>
+
+      <p><b>Conditioning signals that do not exist in any dataset.</b> Once bodies have names and trajectories, you can draw representations that no camera and no render pass produces: where a body <em>has been</em>, as a decaying streak, so one frame carries its own recent history; which silhouette is in front, with metric distance thrown away; only the contact patches, drawn where bodies actually touch; a scrolling raster of contact events, one row per body, one column per frame, so that time becomes a spatial axis the model can read. There is no AOV for "where has this body been". These are projections of a named state, and about nine of my two dozen prior forms have no counterpart in the published control literature.</p>
+
+      <p><b>A property becomes a knob.</b> In the long-video work, every baseline sits at a fixed point on the plane of consistency against dynamism, and that point is pinned by its mechanism — a system that holds still is not choosing to. Spending the budget differently spans a controllable frontier across that plane instead. The interesting claim is not "we score higher"; it is that the axis stopped being inherited.</p>
+
+      <p><b>Ground truth becomes free.</b> The most under-rated of the four. If a simulator owns the application state, then every cursor target, every field edit, every record's final bucket is exact and costs nothing — which is what turns deep-reasoning evaluation from guesswork into arithmetic. On that basis I generated a hundred unbroken ten-minute sessions, about 16.7 hours and 39,478 actions, and roughly 1,900 questions whose difficulty and reasoning type are assigned <em>by construction</em> rather than by annotation: counting, state tracking, long-range state, causal, temporal order, arithmetic-over-state. Nobody labelled any of it. Nobody could have.</p>
+
+      <p><b>Failure knowledge compounds.</b> The failure-mode library is not prose in a wiki that somebody has to recognise the situation for; it is mechanised into detectors that run on the artefact. And the agent's own skills document starts empty and is written entirely by the agent from its own episodes, with merges that only ever add or refine — a malformed reply that parses to zero skills leaves the document exactly as it was, so learning can only move forward. Recall ranks by mechanism before scale, on the theory that a topple is a topple at any size.</p>
+
+      <p>A related finding I did not expect, and the reason this section is not just architecture: the harness had to be <b>pushed rather than offered</b>. When it was available as an optional tool, the agent called it zero times over a full run and rewrote code blind. It now arrives unbidden in the observation after every bake. An agent that has to remember to look is an agent without a harness — which I suspect generalises well past my setting.</p>
+
+      <h2 id="dont">What I have not shown</h2>
+
+      <p>The reason to trust anything above is that I keep this list, so here it is.</p>
+
+      <p>The closed loop is <b>unrendered</b>. I have matched pairs where one arm's program passed the geometric judge and another arm's program for the same intent failed it, everything downstream held identical — same seed, same steps, same prompt file byte for byte, generated from the intent alone so neither half can be flattered by its own description. Zero of those pairs have both video halves on disk. Until they do, "a better program makes a better video" is a design, not a result, and I say so on the page.</p>
+
+      <p>The novel priors are <b>verified but not consumed</b>. Nine invented representations, four rasterised into conditioning videos, none yet through the video model. So the claim that the conditioning form is a free variable currently rests on three forms, not two dozen. A prior that cannot be handed to the model is a metric, not a conditioning channel.</p>
+
+      <p>The agent comparison is <b>twelve intents</b>, not the full bank. Mass plausibility silently cannot be measured in the current bake, so it is reported as a skip rather than as a pass. The judge reads geometry and therefore cannot see that a crate looks like a crate, or that thrown dust reads at all — and I have a separate ablation showing that those things do matter. There is one video model in the grid, so "the constraints come from the model" is demonstrated against exactly one decoder's geometry.</p>
+
+      <p>And in the long-video work, the honest framing of my strongest table is that a consistency number a frozen rollout would win is not a number I get to claim.</p>
+
+      <h2 id="next">Where I would take it</h2>
+
+      <p>The three systems agree on what is missing, which is that all of the above is still a human noticing a number. The constraints are derivable — the camera and the resolution and the decoder's stride give you the representability floor; the engine's configuration gives you the contact tolerance; the program already declares which bodies must move and in what order. Nothing in that chain requires taste. So the thing I want to build is a planner that derives the scale of the geometry from the constraints of whatever will eventually consume it, rather than producing a physically plausible scene and discovering afterwards that it is below the floor.</p>
+
+      <p>The larger version, and the reason I keep working on the unglamorous half of the stack: I do not think the interesting frontier is a model that hallucinates less. It is a system where a claim can be attached to an artefact and checked by something the generator does not control. Freeze the model. Name the state. Fix the budget and argue about what it buys. Put the audit inside the thing being audited, and give every checker a control that makes it fail.</p>
+
+      <p>That is one idea, and I have now built it three times.</p>
+
+      <div class="post-foot">
+        <a href="../index.html#writing">← All writing</a>
+        <a href="metrics-that-lie.html">Next: Four times my metric lied to me →</a>
+      </div>
+    </article>
+
+    <script>
+      const tb = document.getElementById("topbar");
+      addEventListener("scroll", () => tb.classList.toggle("scrolled", scrollY > 8), { passive: true });
+      const links = [...document.querySelectorAll(".toc a")];
+      const ids = links.map((a) => a.getAttribute("href").slice(1));
+      const spy = new IntersectionObserver((es) => {
+        es.forEach((e) => { if (e.isIntersecting) {
+          links.forEach((l) => l.classList.remove("active"));
+          const a = links.find((l) => l.getAttribute("href") === "#" + e.target.id);
+          if (a) a.classList.add("active");
+        }});
+      }, { rootMargin: "-70px 0px -70% 0px" });
+      ids.forEach((id) => { const el = document.getElementById(id); if (el) spy.observe(el); });
+    </script>
+  </body>
+</html>

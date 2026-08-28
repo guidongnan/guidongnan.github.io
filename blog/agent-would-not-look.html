@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <title>The agent that would not look · Dongnan Gui</title>
+    <meta name="description" content="An autonomous agent with memory, retrieval and eight tools lost to a dumb fixed loop while spending three times the tokens. What fixed it was not intelligence — it was making the measurement impossible to ignore." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;450;500;600&family=JetBrains+Mono:wght@400;500&family=Noto+Serif+SC:wght@500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="blog.css" />
+  </head>
+  <body>
+    <header class="topbar" id="topbar">
+      <a class="home" href="../index.html">Dongnan Gui</a>
+      <a href="../index.html#writing">← All writing</a>
+      <a href="agent-would-not-look.zh.html">中文</a>
+    </header>
+
+    <nav class="toc" id="toc">
+      <div class="toc-h">Contents</div>
+      <a href="#lost">The agent lost</a>
+      <a href="#zero">Zero times</a>
+      <a href="#budget">It was the budget</a>
+      <a href="#forward">Learning that only moves forward</a>
+      <a href="#take">What I take from it</a>
+    </nav>
+
+    <article>
+      <div class="post-head">
+        <div class="kicker">Notebook</div>
+        <h1>The agent that would not look</h1>
+        <div class="meta">
+          <span>August 2026</span><span class="dot"></span>
+          <span>~7 min</span><span class="dot"></span>
+          <span>agents · tools · evaluation</span>
+        </div>
+      </div>
+
+      <p class="lead">I built an agent with a planner, episodic memory, retrieval over a failure-mode library, a skills document it maintains about itself, and eight tools. On a matched set of tasks it lost to a fixed <code>generate → verify → repair</code> loop, while spending about three times the tokens. Everything I did to make it smarter made it worse. The thing that finally worked was embarrassingly dumb, and I think it generalises.</p>
+
+      <p>The setting: an agent writes a small program, a solver runs it, and a harness measures whether the program actually produced the event it claimed. I will keep the domain vague because parts are not mine to publish, but nothing below depends on it.</p>
+
+      <h2 id="lost">The agent lost</h2>
+
+      <p>The fixed loop is what everyone builds first. Generate, verify, repair, N times, with the verifier at the centre and no decisions to make. The agent inverts that: it plans, then chooses one action per turn, observes the result, consults its memory and its own notes, and decides when it is finished. The verifier becomes one tool among eight.</p>
+
+      <p>On twelve matched tasks, the fixed loop solved seven. The agent solved six, having spent roughly three times as many tokens getting there. That is a bad result and I sat with it for a while, because on paper the agent strictly dominates: it can do everything the loop does, plus choose.</p>
+
+      <p>My first instinct was that it was wandering — spending its budget on exploration and running out of room to land the scene. So I added a nudge: when three steps remain, wrap up. That took it from six to <b>three</b>. Worse than the loop, worse than itself, worse than one-shot.</p>
+
+      <figure class="plain">
+        <svg viewBox="0 0 820 250" role="img" aria-label="On twelve matched tasks: fixed loop solves 7; the agent at a 14-step budget solves 6 with about three times the tokens; adding a nudge to finish early drops it to 3; raising the budget to 24 steps takes it to 8.">
+          <text x="0" y="14" font-family="Inter, system-ui, sans-serif" font-size="12" fill="#8b8b95">tasks solved / 12</text>
+          <text x="560" y="14" font-family="Inter, system-ui, sans-serif" font-size="12" fill="#8b8b95">tokens spent</text>
+
+          <text x="0" y="52" font-family="Inter, system-ui, sans-serif" font-size="13" fill="#33333b">fixed loop</text>
+          <rect x="150" y="38" width="245" height="18" rx="3" fill="#a8a8b4"/>
+          <text x="403" y="52" font-family="Inter, system-ui, sans-serif" font-size="12.5" fill="#8b8b95">7</text>
+          <rect x="560" y="42" width="26" height="10" rx="2" fill="#d8d8de"/>
+          <text x="596" y="52" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#8b8b95">1×</text>
+
+          <text x="0" y="98" font-family="Inter, system-ui, sans-serif" font-size="13" fill="#33333b">agent, 14 steps</text>
+          <rect x="150" y="84" width="210" height="18" rx="3" fill="#c2412d" opacity="0.7"/>
+          <text x="368" y="98" font-family="Inter, system-ui, sans-serif" font-size="12.5" fill="#c2412d">6</text>
+          <rect x="560" y="88" width="82" height="10" rx="2" fill="#e8c4bc"/>
+          <text x="652" y="98" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#c2412d">~3×</text>
+
+          <text x="0" y="144" font-family="Inter, system-ui, sans-serif" font-size="13" fill="#33333b">+ nudge to finish early</text>
+          <rect x="150" y="130" width="105" height="18" rx="3" fill="#c2412d" opacity="0.7"/>
+          <text x="263" y="144" font-family="Inter, system-ui, sans-serif" font-size="12.5" fill="#c2412d">3</text>
+          <rect x="560" y="134" width="72" height="10" rx="2" fill="#e8c4bc"/>
+          <text x="642" y="144" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#c2412d">~3×</text>
+
+          <text x="0" y="190" font-family="Inter, system-ui, sans-serif" font-size="13" font-weight="600" fill="#16161a">agent, 24 steps</text>
+          <rect x="150" y="176" width="280" height="18" rx="3" fill="#4b41d8"/>
+          <text x="438" y="190" font-family="Inter, system-ui, sans-serif" font-size="12.5" font-weight="600" fill="#4b41d8">8</text>
+          <rect x="560" y="180" width="178" height="10" rx="2" fill="#bcb7f0"/>
+          <text x="748" y="190" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#4b41d8">~7×</text>
+
+          <line x1="0" y1="214" x2="820" y2="214" stroke="#ececef"/>
+          <text x="0" y="238" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#8b8b95">Only one variable changed between the last two rows: the step budget. Same agent, same tools, same prompt.</text>
+        </svg>
+        <figcaption>Every attempt to make the agent decide better made it worse. Letting it decide more times made it better.</figcaption>
+      </figure>
+
+      <p>Then I changed one variable and nothing else: I raised the step budget from fourteen to twenty-four. It went to eight, past the fixed loop. Same agent, same tools, same prompt, same tasks.</p>
+
+      <p>So the agent's advantage was never autonomy in the sense I had been imagining — good judgement about what to do next. It was that autonomy let it spend <em>more, better-targeted iterations</em>. When I capped the iterations, all the machinery underneath was just overhead.</p>
+
+      <h2 id="zero">Zero times</h2>
+
+      <p>The other half of the diagnosis is the part I find funniest and most useful.</p>
+
+      <p>In the original design, the harness — the thing that measures whether the program did what it claimed — was available as a tool. The agent could call it whenever it wanted. It had a retrieval tool over a library of previously diagnosed failures, too. Both sat there in the tool list, described clearly, alongside <code>write_code</code> and <code>run_backend</code>.</p>
+
+      <p>Across an entire run, the agent called the retrieval tool <b>zero times</b>. It rewrote code blind, over and over, guessing at what had gone wrong.</p>
+
+      <p>I want to be precise about why this is interesting, because "the model didn't use my tool" is a boring observation on its own. The interesting part is what it says about where information has to live. The agent was not incapable of using the harness; when I invoked it manually the agent used the result perfectly well. It simply never chose to look, because looking costs a turn and produces no visible progress, while writing more code feels like progress and is what the whole system was nudging it toward.</p>
+
+      <p>The fix was to stop offering and start pushing. Now, after every successful run of the program, the tool result <em>is</em> the full measurement block: what the program achieved, what constraints it violated, which known failure modes fired, and the relevant retrieved repair notes. The agent does not decide to look. Looking is what running returns.</p>
+
+      <figure class="plain">
+        <svg viewBox="0 0 820 210" role="img" aria-label="Left: the harness offered as an optional tool, which the agent called zero times, leading to blind rewrites. Right: the harness pushed into the observation returned by running the program, so every run is followed by a measurement.">
+          <defs>
+            <marker id="b1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#8b8b95"/></marker>
+          </defs>
+          <text x="0" y="14" font-family="Inter, system-ui, sans-serif" font-size="12.5" font-weight="600" fill="#c2412d">offered</text>
+          <rect x="0" y="30" width="120" height="42" rx="8" fill="#fff" stroke="#e2e2e7"/>
+          <text x="60" y="56" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="12.5" fill="#33333b">run program</text>
+          <line x1="126" y1="51" x2="150" y2="51" stroke="#8b8b95" marker-end="url(#b1)"/>
+          <rect x="156" y="30" width="120" height="42" rx="8" fill="#fff" stroke="#e2e2e7"/>
+          <text x="216" y="56" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="12.5" fill="#33333b">rewrite blind</text>
+          <path d="M216 76 C 216 104, 60 104, 60 78" fill="none" stroke="#c2412d" stroke-dasharray="4 4"/>
+          <rect x="300" y="30" width="128" height="42" rx="8" fill="#faf7f7" stroke="#e8c4bc" stroke-dasharray="5 4"/>
+          <text x="364" y="49" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="12" fill="#c2412d">harness tool</text>
+          <text x="364" y="65" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#c2412d">called 0 times</text>
+          <text x="0" y="126" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#8b8b95">Looking costs a turn and shows no progress. Writing code feels like progress.</text>
+
+          <line x1="0" y1="146" x2="820" y2="146" stroke="#ececef"/>
+
+          <text x="0" y="176" font-family="Inter, system-ui, sans-serif" font-size="12.5" font-weight="600" fill="#4b41d8">pushed</text>
+          <rect x="96" y="160" width="120" height="34" rx="8" fill="#fff" stroke="#e2e2e7"/>
+          <text x="156" y="181" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="12.5" fill="#33333b">run program</text>
+          <line x1="222" y1="177" x2="246" y2="177" stroke="#8b8b95" marker-end="url(#b1)"/>
+          <rect x="252" y="160" width="250" height="34" rx="8" fill="#eeecfb" stroke="#4b41d8"/>
+          <text x="377" y="181" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="12.5" fill="#4b41d8">the measurement comes back with it</text>
+          <line x1="508" y1="177" x2="532" y2="177" stroke="#8b8b95" marker-end="url(#b1)"/>
+          <rect x="538" y="160" width="128" height="34" rx="8" fill="#fff" stroke="#e2e2e7"/>
+          <text x="602" y="181" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="12.5" fill="#33333b">targeted repair</text>
+          <text x="686" y="181" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#8b8b95">no decision required</text>
+        </svg>
+        <figcaption>An agent that has to remember to look is an agent without a harness.</figcaption>
+      </figure>
+
+      <p>I have started treating this as a design rule rather than a bug fix. If a piece of information is necessary for the agent to do the task correctly, it does not belong in the tool list. It belongs in the observation. Optional access to the truth is, in practice, no access to the truth.</p>
+
+      <h2 id="budget">It was the budget, and that is a boring answer</h2>
+
+      <p>Put the two findings together and the story is unglamorous. The agent's memory, its retrieval, its self-written notes — none of that was the lever. The levers were:</p>
+
+      <ul>
+        <li><b>How many repair rounds it gets.</b> Dominant, by a distance.</li>
+        <li><b>Whether the measurement is unavoidable.</b> Second, and it is what makes extra rounds worth anything, because a round without feedback is just another blind draft.</li>
+      </ul>
+
+      <p>This lines up with something I saw on a larger benchmark in the same project: an arm that draws five independent programs and keeps whichever its own verifier likes best barely beats one-shot, and loses to plain repair. Five tries at guessing is not the same resource as one try plus a measurement, even when the five tries cost more.</p>
+
+      <p>There is a version of this I would like to be wrong about, so let me state the limit clearly: my agent comparison is twelve tasks. Twelve. The direction was stable across the variations I tried and the mechanism is legible, but I would not put a confidence interval on it, and I have not yet re-run the pushed-harness agent over the full bank.</p>
+
+      <h2 id="forward">Learning that only moves forward</h2>
+
+      <p>One piece of the machinery I do still believe in, mostly because of how it fails.</p>
+
+      <p>The agent maintains a document of its own lessons. It starts completely empty — nothing seeded, no examples. After each episode the agent distils what it learned into a section and merges it in. The merge is constrained so that it can only <b>add or refine</b>, never delete. And if a malformed reply parses to zero lessons, the document is left exactly as it was.</p>
+
+      <p>That last clause is the one that matters. It means a bad generation cannot erase accumulated knowledge; the worst case is a wasted turn. Learning is monotone. I would rather have a slightly bloated document that only grows than a tidy one that can silently forget the thing that took me two days to diagnose.</p>
+
+      <p>The retrieval over it is deliberately plain — term frequencies, no embeddings. The match here is lexical, because symptoms and fixes share concrete nouns, and a plain index re-indexes in milliseconds when the agent's own document grows mid-run. A dense retriever would have bought me very little and cost me the ability to re-index on every write.</p>
+
+      <p>The memory of past episodes is ranked by <em>mechanism</em> first and scale second, on the theory that a topple is a topple whether it is a bookshelf or a domino. Successful episodes get a small preference bump — small enough that a failure with the same mechanism, which is more likely to be on point, still outranks a loosely related success.</p>
+
+      <h2 id="take">What I take from it</h2>
+
+      <p>Three things, in order of how much I would defend them.</p>
+
+      <p><b>Necessary information goes in the observation, not the tool list.</b> I am fairly confident this generalises well beyond my setting. Anything the agent must consult to be correct, it will eventually not consult.</p>
+
+      <p><b>Count repair rounds before you count anything else.</b> When an agent underperforms, the reflex is to improve its reasoning — better prompts, better planning, better memory. In my case the entire gap was iterations, and every reasoning improvement I made was invisible next to it. Sweep the budget first; it is cheap and it tells you whether you are even looking at the right variable.</p>
+
+      <p><b>Autonomy is a way of spending, not a source of quality.</b> The agent is better than the fixed loop, but not because it chooses wisely. It is better because it can decide to keep going when the loop would have stopped. That is a real advantage and worth having. It is just not the one I was telling myself I had built.</p>
+
+      <div class="post-foot">
+        <a href="hold-the-model-fixed.html">← Related: Hold the model fixed</a>
+        <a href="../index.html#writing">All writing →</a>
+      </div>
+    </article>
+
+    <script>
+      const tb = document.getElementById("topbar");
+      addEventListener("scroll", () => tb.classList.toggle("scrolled", scrollY > 8), { passive: true });
+      const links = [...document.querySelectorAll(".toc a")];
+      const ids = links.map((a) => a.getAttribute("href").slice(1));
+      const spy = new IntersectionObserver((es) => {
+        es.forEach((e) => { if (e.isIntersecting) {
+          links.forEach((l) => l.classList.remove("active"));
+          const a = links.find((l) => l.getAttribute("href") === "#" + e.target.id);
+          if (a) a.classList.add("active");
+        }});
+      }, { rootMargin: "-70px 0px -70% 0px" });
+      ids.forEach((id) => { const el = document.getElementById(id); if (el) spy.observe(el); });
+    </script>
+  </body>
+</html>

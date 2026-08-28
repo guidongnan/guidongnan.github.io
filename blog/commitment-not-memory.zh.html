@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <title>你的视频模型不需要更好的记忆，它需要作出承诺。· Dongnan Gui</title>
+    <meta name="description" content="长视频的漂移通常被当成检索问题。我主张它其实是承诺问题：本文说明为什么压缩过去消除不了随 T 开平方增长的漂移，撤回我上个月提出的写入门控，并给出一个能证明我错了的实验。" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;450;500;600&family=JetBrains+Mono:wght@400;500&family=Noto+Serif+SC:wght@500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="blog.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" />
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"
+      onload="renderMathInElement(document.body,{delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}],throwOnError:false})"></script>
+  </head>
+  <body>
+    <header class="topbar" id="topbar">
+      <a class="home" href="../index.zh.html">Dongnan Gui</a>
+      <a href="../index.zh.html#writing">← 全部文章</a>
+      <a href="commitment-not-memory.html">English</a>
+    </header>
+
+    <nav class="toc" id="toc">
+      <div class="toc-h">目录</div>
+      <a href="#three">我们用「记忆」指代的三样东西</a>
+      <a href="#drift">为什么压缩修不了漂移</a>
+      <a href="#retract">撤回我自己提出的写入门控</a>
+      <a href="#taxonomy">一张能作出预测的分类表</a>
+      <a href="#blind">为什么我们的指标看不见这件事</a>
+      <a href="#layer">一个承诺层长什么样</a>
+      <a href="#wrong">怎样证明我是错的</a>
+      <a href="#believe">我真正相信的是什么</a>
+    </nav>
+
+    <article>
+      <div class="post-head">
+        <div class="kicker">视频生成札记</div>
+        <h1>你的视频模型不需要更好的记忆，它需要作出承诺。</h1>
+        <div class="meta">
+          <span>2026 年 8 月</span><span class="dot"></span>
+          <span>约 14 分钟</span><span class="dot"></span>
+          <span>自回归视频 · 漂移 · 评测</span>
+        </div>
+      </div>
+
+      <p class="lead">上个月我写过，长视频的瓶颈是记忆而不是上下文。现在我认为，那篇文章是以最昂贵的那种方式对了一半：诊断对了，药方错了。压缩过去并不能阻止一个世界发生漂移（drift）。任何只对已经发生的事情做总结的机制，都做不到这一点。</p>
+
+      <p>下面是我想要辩护的主张，以及让它不只是一句口号的那点算术：<b>长视频的不连贯不是检索（retrieval）失败，而是承诺（commitment）失败。</b>模型并没有「丢掉」沙发是蓝色的这个事实。它从一开始就没有把自己绑定到「沙发是蓝的」上面，所以根本没有什么可丢的——只有一件事要重新猜，猜三百次，而每一次猜测都以上一次为条件。</p>
+
+      <h2 id="three">我们用「记忆」指代的三样东西</h2>
+
+      <p>几乎所有关于长视频的争论，都把三个不同的量塌缩进<em>记忆</em>这一个词里。把它们拆开，本身就占了这件事的大半工作量。</p>
+
+      <div class="tbl-wrap">
+        <table>
+          <thead>
+            <tr><th>量</th><th>它是什么</th><th>规模</th><th>把它做大的代价</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><b>记录（record）</b></td><td>实际被渲染出来的东西：latent、token、KV cache</td><td>$\mathcal{O}(T)$，而且非常庞大</td><td>显存带宽</td></tr>
+            <tr><td><b>触及范围（reach）</b></td><td>注意力被允许往回看多远</td><td>一个超参数</td><td>注意力计算量</td></tr>
+            <tr><td><b>承诺（commitment）</b></td><td>模型把自己绑定其上的那些事实：身份、布局、配色、光是从哪儿来的</td><td>极小，大概 $10^2$ 个数</td><td>没有代价。因为它根本没有被表示出来。</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>长上下文（long-context）这一路的工作，买的是<em>记录</em>之上的<em>触及范围</em>；压缩记忆这一路的工作，包括我自己的，买的是更便宜的<em>记录</em>。两者都没有表示出<em>承诺</em>，而我逐渐认为，一致性只是承诺的性质。</p>
+
+      <p>这个区分不是哲学层面的，而是回忆（recall）与推断（inference）的区别。如果沙发的蓝色只活在记录里，那么模型每一步都必须在像素上做注意力，把它<em>重新推导</em>一遍。重新推导是一次推断，从随机模型里做的推断就是一次采样，而采样是会动的。回忆不会动——这正是回忆的全部意义。</p>
+
+      <h2 id="drift">为什么压缩修不了漂移</h2>
+
+      <p>令 $c^\star \in \mathbb{R}^k$ 表示那一小组事实：只有它们保持不变，一段视频才会让人觉得是同一个世界。一个没有显式载体的模型，只能在每一步从它已经生成的内容里把它重建出来：</p>
+
+      $$ \hat c_t \;=\; f_\theta\!\left(x_{&lt;t}\right). $$
+
+      <p>注意这里的回路。帧 $x_{&lt;t}$ 本身就是以 $\hat c_{t-1}$ 为条件生成的，所以它们早已把上一步的估计连同误差一起体现了出来。模型测量的不是世界，而是它自己上一次对世界的意见。把每一步的增量写成噪声，就得到</p>
+
+      $$ \hat c_{t+1} \;=\; \hat c_t + \eta_t, \qquad \mathbb{E}[\eta_t] = 0, \quad \operatorname{Var}[\eta_t] = \sigma^2 I. $$
+
+      <p>这是一个没有回复力的随机游走（random walk），于是</p>
+
+      $$ \mathbb{E}\big\lVert \hat c_T - c^\star \big\rVert^2 \;=\; k\,\sigma^2 T, \qquad \text{RMS drift} \;\propto\; \sigma\sqrt{T}. $$
+
+      <p>关键的一点在这里。压缩记录只改变 $\sigma$，别的什么都不改。压缩器会丢掉信息，所以它最好的情况是不动 $\sigma$，现实中则是把它抬高。不存在任何一个 $\sigma$ 的取值，能把 $\sigma\sqrt{T}$ 变成常数。<b>记录压缩挪的是常数；它改不了指数。</b></p>
+
+      <div class="callout"><b>那条承重的假设。</b>这是一个模型，不是一次测量。它假设每一步的增量是零均值且大致独立的——当没有任何东西给估计提供锚点时，你拿到的就是这种增量。如果某个方法提供了锚点，增量之间就会变得相关，随机游走也就成了一个有界过程。这恰恰是我所主张的、区分这两类方法的性质，也正是最后一节的实验想要检出的东西。</div>
+
+      <h2 id="retract">撤回我自己提出的写入门控</h2>
+
+      <p>在<a href="long-video-memory.html">上一篇文章</a>里，我提出了一个逐槽位的写入门控（write gate），我到现在还是喜欢它的形状：</p>
+
+      $$ M_t \;=\; (1-\alpha)\,M_{t-1} + \alpha\,\tilde H_t, \qquad \alpha = \sigma\!\left(w^\top[\,M_{t-1};\,c_t\,]\right). $$
+
+      <p>它到底有没有用，完全取决于 $\tilde H_t$ 是什么，而这一点我当时没有说。从那篇文章出发，两种读法都站得住，但只有一种真的成立。</p>
+
+      <p><b>读法一：有锚点。</b>假设 $\tilde H_t = c^\star + \epsilon_t$，噪声相互独立，也就是说，写入是由新鲜的外部证据驱动的。那么这条更新就是一个指数滤波器，它的稳态方差有界：</p>
+
+      $$ \operatorname{Var}[M_\infty] \;=\; \frac{\alpha}{2-\alpha}\,\sigma^2 \;\xrightarrow[\ \alpha \to 0\ ]{}\; 0. $$
+
+      <p><b>读法二：自我指涉。</b>换成 $\tilde H_t = M_{t-1} + \epsilon_t$，也就是写入的内容，是从模型自己刚刚生成的帧里总结出来的。那么</p>
+
+      $$ M_t \;=\; M_{t-1} + \alpha\,\epsilon_t \quad\Longrightarrow\quad \operatorname{Var}[M_t] \;=\; \alpha^2\sigma^2\,t, $$
+
+      <p>这还是同一个随机游走，只是被 $\alpha^2$ 放慢了。小门控买到的是时间，不是稳定性——而 $\sqrt{T}$ 很有耐心。</p>
+
+      <p>在一个自回归（autoregressive）生成器里，第一帧之后再没有外部输入，读法二才是对实际情况的诚实描述。所以我提出的那个门控，是一个披着记忆外衣的方差缩减器。与其让它就这么立在那里，我宁愿把话挑明。</p>
+
+      <h2 id="taxonomy">一张能作出预测的分类表</h2>
+
+      <p>分类表是廉价的。这一张之所以配得上版面，只因为它的每一行都蕴含着一种不同<em>形状</em>的失效曲线——也就是说，这张表是可证伪的。</p>
+
+      <div class="tbl-wrap">
+        <table>
+          <thead>
+            <tr><th>类别</th><th>携带的是什么</th><th>锚定于</th><th>预测的重访误差随间隔 $\Delta$ 的变化</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>截断 / 滑动窗口 <a href="#r1">[1]</a>、<a href="#r5">[5]</a></td><td>最近的记录</td><td>窗口之外什么都没有</td><td>先是平的，到窗口边缘出现断崖</td></tr>
+            <tr><td>记录压缩 <a href="#r2">[2]</a>，以及我自己的 <a href="#r8">[8]</a></td><td>记录的有损摘要</td><td>它自己过去的摘要</td><td>$\propto\sqrt{\Delta}$，斜率更平缓</td></tr>
+            <tr><td>固定大小的循环状态 <a href="#r4">[4]</a></td><td>一个被反复覆写的向量</td><td>它自己过去的状态</td><td>$\propto\sqrt{\Delta}$</td></tr>
+            <tr><td>隐式世界状态 <a href="#r3">[3]</a>、<a href="#r6">[6]</a></td><td>一个带动力学的、学出来的状态</td><td>观测，如果有观测的话</td><td>有观测时有界，做想象时漂移</td></tr>
+            <tr><td>显式几何 <a href="#r7">[7]</a>、<a href="#r9">[9]</a></td><td>一个场景，而不是一份摘要</td><td>一个坐标系</td><td>对 $\Delta$ 有界；在没被建模的东西上失效</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>这张表里有意思的是最后一列，因为它说的是：这几类方法并不排在同一条质量光谱上，而是落在形状不同的曲线上。如果你把重访误差对间隔画出来，发现每种方法给出的曲线形状都一样、只差一个偏移量，那我的框架就是错的，而这个领域现有的框架是对的。</p>
+
+      <h2 id="blind">为什么我们的指标看不见这件事</h2>
+
+      <p>这套论证一直很容易被绕开，是有原因的：标准的自动指标看不见漂移，其中一些还在主动奖励漂移的反面。看看那个换着马甲出现在多数视频基准里的帧间一致性分数：</p>
+
+      $$ S \;=\; \frac{1}{T-1}\sum_{t=1}^{T-1} \cos\!\big(\phi(x_t),\, \phi(x_{t+1})\big), $$
+
+      <p>其中 $\phi$ 是某个预训练的图像编码器。问一句：什么东西能把它最大化？一段从不变化的视频，对每个 $t$ 都有 $\phi(x_t) = \phi(x_{t+1})$，于是 $S = 1$，取到能达到的最高值。<b>一致性指标的全局最优解，是一张静止图片。</b></p>
+
+      <p>这就是为什么平凡基线（trivial baseline）不是走形式。如果你要报一个一致性数字，你就欠读者一个并排放着的冻结帧分数，因为那个分数就是天花板——一个逼近它的模型，可能是在成功，也可能是在死去。指标分不出是哪一种，读者也分不出。</p>
+
+      <p>真正能看见漂移的，是一个让相机回到原处的指标。在会重复出现的位姿 $\pi$ 上，定义间隔 $\Delta$ 处的重访误差：</p>
+
+      $$ R(\Delta) \;=\; \mathbb{E}_{t,\;\pi_t = \pi_{t+\Delta}} \Big[\, d\big(x_t,\; x_{t+\Delta}\big) \,\Big]. $$
+
+      <p>$R$ 具备 $S$ 所缺的那个性质：冻结视频在 $R$ 上同样满分，但只要旁边一并报出任何运动量或任务指标，它就会被轻易排除；而冻结视频在 $S$ 上拿到满分之后，<em>还</em>看起来像是成功。$\big(R(\Delta),\ \text{motion}\big)$ 这一对，没法像单看 $S$ 那样靠「什么都不做」刷上去。</p>
+
+      <h2 id="layer">一个承诺层长什么样</h2>
+
+      <p>如果诊断是对的，设计就随之而来，而且它把我上个月说的话反了过来。我当时说，难的部分是学会该忘掉什么。我现在认为，难的部分是<b>学会拒绝改变什么。</b></p>
+
+      <p>具体地说，把平滑的门控换成一个决策。保留槽位 $M^{(i)}$，只有当进来的证据确实与它矛盾时，才更新槽位 $i$：</p>
+
+      $$ M^{(i)}_t \;=\; \begin{cases} \tilde H^{(i)}_t, & d\big(M^{(i)}_{t-1},\, \tilde H^{(i)}_t\big) > \tau \\[4pt] M^{(i)}_{t-1}, & \text{otherwise.} \end{cases} $$
+
+      <p>重点在第二个分支：是严格相等，而不是朝新值挪一小步。在随机游走模型下，正是这一点消掉了累积——低于 $\tau$ 的增量贡献的是「完全没有」，而不是「一点点」，于是游走没法把自己的噪声积分起来。代价是一个很有杀伤力的超参数：$\tau$ 设得太高，世界就再也无法合法地发生变化——在一个生成式视频模型里，这是个糟糕的失效模式，因为世界本来就应该变。</p>
+
+      <p>这组张力才是真正的研究问题，而且我不认为它是一个表示学习（representation learning）问题。它是一个变化检测（change detection）问题——而变化检测有一整片成熟的文献，视频生成这个圈子基本没读过。</p>
+
+      <div class="callout"><b>这个想法从哪儿来。</b>我反复回到的那个视角是：一张图片所固定下来的世界，远远多于它所显示出来的——这是<a href="single-image-world.html">早前一则笔记</a>的论点，也是我们那篇「从单张图片生成可交互世界」的工作的论点 <a href="#r9">[9]</a>。如果一帧就决定了这么多，那么接下来三百帧的任务，主要就是<em>别去和它矛盾</em>。这个任务比「把它们全都记住」窄得多。</div>
+
+      <h2 id="wrong">怎样证明我是错的</h2>
+
+      <p>这个实验我还没有跑。数字没有出来，我也不打算写一张我并没有做出来的结果表。我能做的，是把它规定得足够严密，值得某个人——包括我自己——花上一个下午。</p>
+
+      <p><b>设置。</b>沿闭合的相机轨迹驱动生成，使位姿 $\pi$ 以受控的间隔 $\Delta$ 重复出现。让 $\Delta$ 至少扫过一个数量级，例如 8 到 256 帧。按上面的定义报告 $R(\Delta)$。</p>
+
+      <p><b>必须出现的基线</b>，因为没有它们，这张图根本没法读：</p>
+      <ul>
+        <li><b>冻结帧。</b>整段视频重复第一帧。它是所有一致性指标的天花板，也是所有运动指标的地板。如果它不在图上，这张图就不算证据。</li>
+        <li><b>无记忆。</b>窗口长度为一，外加一个强解码器。这是「头两秒看着还行」的对照组。</li>
+        <li><b>Oracle 回忆。</b>每次重访时，直接把第一次访问的那一帧贴上去。按构造，它在 $R$ 上接近零分，同时告诉你剩下的误差里有多少来自生成质量、而非漂移。</li>
+      </ul>
+
+      <p><b>预测。</b>在双对数坐标下，记录压缩类方法应当给出 $\log R \approx \tfrac{1}{2}\log\Delta + b$，斜率接近二分之一，同类之间只差一个 $b$。而一个承诺机制应当从这条线上弯开、变平。如果每一种方法都落在一条斜率为二分之一的直线上，唯一的差别只是截距，那么我划出的这个区分并不存在，这篇文章也就是以我最希望知道的那种方式错了。</p>
+
+      <p><b>什么会让结论悬而未决。</b>$\Delta$ 的范围太小——在一个倍频程上，什么曲线看着都是平的。相机从来没有真正回到原处的数据集，而大多数数据集都是这样。以及任何一个编码器 $\phi$ 未曾针对该失效模式、用人对「同一个地方、同一个世界」的判断做过校准的指标——未经校准的 $\phi$ 会报出没有任何人会认可的一致。</p>
+
+      <h2 id="believe">我真正相信的是什么</h2>
+
+      <p>注意力不是约束所在。窗口更长这件事，没有哪一处能让模型决定「沙发是蓝的」并且一直守住这个决定。约束在于：我们的模型里没有一个语义为<em>「除非有东西与之矛盾，否则它不变」</em>的表示槽位，而且就算有了，也没有哪种评测会注意到。</p>
+
+      <p>比起继续发表更平缓的斜率、再把它称作进展，我宁愿在指数这件事上公开地错一次。如果某个压缩器的重访曲线跑出来是平的，我会在这里说出来。</p>
+
+      <hr />
+      <div class="refs">
+        <h3>参考文献</h3>
+        <ol>
+          <li id="r1">Dai, Z., Yang, Z., Yang, Y., Carbonell, J., Le, Q. V., &amp; Salakhutdinov, R. (2019). <a href="https://scholar.google.com/scholar?q=Transformer-XL+Attentive+Language+Models+Beyond+a+Fixed-Length+Context" target="_blank" rel="noopener">Transformer-XL: Attentive Language Models Beyond a Fixed-Length Context</a>. ACL.</li>
+          <li id="r2">Rae, J. W., Potapenko, A., Jayakumar, S. M., &amp; Lillicrap, T. P. (2020). <a href="https://scholar.google.com/scholar?q=Compressive+Transformers+for+Long-Range+Sequence+Modelling" target="_blank" rel="noopener">Compressive Transformers for Long-Range Sequence Modelling</a>. ICLR.</li>
+          <li id="r3">Ha, D., &amp; Schmidhuber, J. (2018). <a href="https://scholar.google.com/scholar?q=Recurrent+World+Models+Facilitate+Policy+Evolution" target="_blank" rel="noopener">World Models</a>. NeurIPS.</li>
+          <li id="r4">Gu, A., &amp; Dao, T. (2023). <a href="https://scholar.google.com/scholar?q=Mamba+Linear-Time+Sequence+Modeling+with+Selective+State+Spaces" target="_blank" rel="noopener">Mamba: Linear-Time Sequence Modeling with Selective State Spaces</a>.</li>
+          <li id="r5">Xiao, G., Tian, Y., Chen, B., Han, S., &amp; Lewis, M. (2024). <a href="https://scholar.google.com/scholar?q=Efficient+Streaming+Language+Models+with+Attention+Sinks" target="_blank" rel="noopener">Efficient Streaming Language Models with Attention Sinks</a>. ICLR.</li>
+          <li id="r6">Hafner, D., Pasukonis, J., Ba, J., &amp; Lillicrap, T. (2023). <a href="https://scholar.google.com/scholar?q=Mastering+Diverse+Domains+through+World+Models+DreamerV3" target="_blank" rel="noopener">Mastering Diverse Domains through World Models (DreamerV3)</a>.</li>
+          <li id="r7">Mildenhall, B., Srinivasan, P. P., Tancik, M., Barron, J. T., Ramamoorthi, R., &amp; Ng, R. (2020). <a href="https://scholar.google.com/scholar?q=NeRF+Representing+Scenes+as+Neural+Radiance+Fields+for+View+Synthesis" target="_blank" rel="noopener">NeRF: Representing Scenes as Neural Radiance Fields for View Synthesis</a>. ECCV.</li>
+          <li id="r8">Gui, D., Guo, X., Zhou, W., &amp; Lu, Y. <a href="https://scholar.google.com/scholar?q=Learnable+Compressed+Memory+for+Autoregressive+Video+Generation" target="_blank" rel="noopener">Learnable Compressed Memory for Autoregressive Video Generation</a>. 审稿中。</li>
+          <li id="r9">Gui, D., Guo, X., Zhou, W., &amp; Lu, Y. (2025). <a href="https://openreview.net/forum?id=PA47sKU8CU" target="_blank" rel="noopener">Image as a World: Generating Interactive World from Single Image via Panoramic Video Generation</a>. NeurIPS.</li>
+        </ol>
+      </div>
+
+      <div class="post-foot">
+        <a href="long-video-memory.html">← 上一篇：记忆，而非上下文</a>
+        <a href="single-image-world.html">下一篇：一张图片已经是一个世界 →</a>
+      </div>
+    </article>
+
+    <script>
+      const tb = document.getElementById("topbar");
+      addEventListener("scroll", () => tb.classList.toggle("scrolled", scrollY > 8), { passive: true });
+      const links = [...document.querySelectorAll(".toc a")];
+      const ids = links.map((a) => a.getAttribute("href").slice(1));
+      const spy = new IntersectionObserver((es) => {
+        es.forEach((e) => { if (e.isIntersecting) {
+          links.forEach((l) => l.classList.remove("active"));
+          const a = links.find((l) => l.getAttribute("href") === "#" + e.target.id);
+          if (a) a.classList.add("active");
+        }});
+      }, { rootMargin: "-70px 0px -70% 0px" });
+      ids.forEach((id) => { const el = document.getElementById(id); if (el) spy.observe(el); });
+    </script>
+  </body>
+</html>

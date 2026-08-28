@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <title>Four times this summer, my own metric lied to me · Dongnan Gui</title>
+    <meta name="description" content="Notes from a few months of building evaluation instruments: a consistency score that rewards standing still, an identity check that depends on print size, a word-overlap score that rewards invention, and a null result that was really a resolution problem." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;450;500;600&family=JetBrains+Mono:wght@400;500&family=Noto+Serif+SC:wght@500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="blog.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" />
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"
+      onload="renderMathInElement(document.body,{delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}],throwOnError:false})"></script>
+  </head>
+  <body>
+    <header class="topbar" id="topbar">
+      <a class="home" href="../index.html">Dongnan Gui</a>
+      <a href="../index.html#writing">← All writing</a>
+      <a href="metrics-that-lie.zh.html">中文</a>
+    </header>
+
+    <nav class="toc" id="toc">
+      <div class="toc-h">Contents</div>
+      <a href="#one">The score that rewards standing still</a>
+      <a href="#two">The identity check that depends on print size</a>
+      <a href="#three">The overlap score that rewarded invention</a>
+      <a href="#four">The null result that was a resolution problem</a>
+      <a href="#five">A fifth, quieter one</a>
+      <a href="#rules">What I do now</a>
+    </nav>
+
+    <article>
+      <div class="post-head">
+        <div class="kicker">Notebook</div>
+        <h1>Four times this summer, my own metric lied to me</h1>
+        <div class="meta">
+          <span>August 2026</span><span class="dot"></span>
+          <span>~9 min</span><span class="dot"></span>
+          <span>evaluation · instruments · lab notes</span>
+        </div>
+      </div>
+
+      <p class="lead">These are notes, not a paper. Over the last few months I worked on three fairly different systems, and each one handed me the same lesson from a different direction: the number I was using to decide things was wrong, and it was wrong in the direction that flattered me. I want to write the four cases down before they smooth over into "we validated our metrics".</p>
+
+      <p>I have kept the project details out of this. One of them is under anonymous review and the others are not mine to publish yet. None of that matters for the part worth keeping, which is the shape of each mistake.</p>
+
+      <h2 id="one">1. The score that rewards standing still</h2>
+
+      <p>Long video, minute-scale. The usual way to report coherence is some flavour of frame-to-frame consistency: embed each frame, average the cosine between neighbours,</p>
+
+      $$ S \;=\; \frac{1}{T-1}\sum_{t=1}^{T-1}\cos\!\big(\phi(x_t),\,\phi(x_{t+1})\big). $$
+
+      <p>Look at what maximizes that. A clip that never changes gives $\phi(x_t)=\phi(x_{t+1})$ for every $t$, so $S=1$. The global optimum of a consistency metric is a still image.</p>
+
+      <p>This is not a thought experiment. On the benchmark I was running, the baselines that quietly stop moving scored <em>highest</em> on background consistency, in the mid-nineties, while their dynamic-degree numbers collapsed into the forties. My own system scored <b>lowest</b> of everything on that consistency number and highest by a wide margin on motion. If I had been tuning toward the headline metric I would have shipped something closer to a photograph.</p>
+
+      <p>What made it concrete was putting nine timestamps from each method side by side, frame-aligned. The high-consistency baseline's nine frames are the same frame. That picture is worth more than the table, and it is the reason I now insist the frozen-clip score sits next to every consistency number I report. It is the ceiling. A method approaching it might be succeeding or might be dying, and the metric cannot tell you which.</p>
+
+      <div class="callout"><b>The rule I took away.</b> If a do-nothing baseline can score well on your metric, that metric cannot be your headline. Report the do-nothing baseline in the same table, every time, and let the reader see how much of your score is just inertia.</div>
+
+      <h2 id="two">2. The identity check that depends on how big you print it</h2>
+
+      <p>Same project, subtler failure. I was checking whether a person stays the same person across a minute using a nine-cell contact sheet. On one clip the identity looked perfect: same face across all nine, obviously one individual.</p>
+
+      <p>Then I pulled pose-matched head crops at 460 px instead of the 168–300 px the contact sheet was printing at. Two different people. Different face shape, different brow, a closed-lip smile becoming a toothy one. The pose gap between the two crops was 0.072, so this was not an artefact of comparing a three-quarter view to a profile. It was simply that at 200 px a face is a suggestion.</p>
+
+      <p>I threw the clip out, and I nearly threw out the honest version of the finding with it, because that clip had been my best-looking example.</p>
+
+      <p>The follow-up was worse for my peace of mind. I checked whether the face-distance number could have caught it for me. Across clips I had already judged by eye, the ones that held identity scored roughly 0.27 to 0.76; the ones that visibly swapped person scored roughly 0.49 to 1.06. Those ranges overlap across most of their width. <b>There is no threshold.</b> Not a badly chosen one — none exists on this data.</p>
+
+      <p>So the number went into the report as something I <em>show</em> and not something I <em>judge</em> with. Judging happens on the artefact, at a size where a human can actually be wrong in public.</p>
+
+      <h2 id="three">3. The overlap score that rewarded invention</h2>
+
+      <p>Different project, different modality. A frozen generator turns a paragraph into an image; a reader model turns the image back into text. Question: how much of what the reader says is actually supported by the original paragraph?</p>
+
+      <p>Counting shared words, my trained readers looked clearly better grounded than the untrained one — roughly 39–48% against 24%. That is the direction you want, and I believed it for about a day.</p>
+
+      <p>Then I had an independent judge model label every clause against the source paragraph, one at a time, grading meaning rather than wording. The ranking flipped. Both trained readers <em>contradicted</em> the source more often than the untrained describer did: about a third and about a half of judged text, against roughly a fifth.</p>
+
+      <p>Reading the flagged clauses explained it immediately. The trained readers write fluent, confident, source-shaped prose and invent the specifics. A comic page becomes a named issue with a number on it. A black bird with a red ribbon becomes a green bird with a red crest and a yellow beak. A quotation gets fabricated verbatim, in the right register.</p>
+
+      <p>And here is the mechanism that makes this a metric failure rather than a model failure: <b>the invented sentences reuse the source's vocabulary.</b> They are built out of the same words, arranged into claims the source never made. Word overlap does not merely fail to catch that. It actively rewards it.</p>
+
+      <p>The one number I kept from that whole exercise is the shuffled-image control: run the same reader on a different image and see how much the score drops. That gap is the only evidence that the answer came from <em>this</em> image rather than from the language model's prior about images in general. Everything else was a measure of fluency wearing a measure of grounding's clothes.</p>
+
+      <h2 id="four">4. The null result that was really a resolution problem</h2>
+
+      <p>Third project. I wanted to know whether a small geometric detail welded onto an object actually changes what a conditioned video model renders, or whether the prompt alone is doing the work. Matched pairs: identical prompt, identical seed, identical steps, geometry differing only by the welded feature. Score each frame by the CLIP margin between a caption that names the feature and one that denies it, three paraphrases, against negative controls.</p>
+
+      <p>The first run came back at $-0.0052$ for one scene, with all three paraphrases pointing the same way. A clean refutation. I sat with it for a while, because it was a tidy negative result and I had been half expecting the geometry not to matter.</p>
+
+      <p>It was not a refutation. The feature is plainly visible on screen — you can see it in the frame. The problem was that I had scored <em>whole frames</em>, and the frame is mostly shelving and cartons. A small local feature was being averaged into a large irrelevant background. When I tightened the crop to the feature, the sign flipped to $+0.0054$, all three paraphrases now agreed, and across all three scenes the effect came out around 3.7 times what the negative controls picked up.</p>
+
+      <p>The lesson is one sentence and I have it written on a sticky note: <b>a negative result from an instrument that cannot resolve the effect is not a negative result.</b> Before you believe a null, work out the smallest effect your measurement could have detected, and check that it is smaller than the effect you were looking for.</p>
+
+      <p>I reported those as three separate results rather than one pooled number, incidentally. Frames within a clip are not independent samples, and three scenes is three scenes.</p>
+
+      <h2 id="five">5. A fifth, quieter one</h2>
+
+      <p>This one did not fool me for long but it is the cleanest example of the pattern. Fine-tuning a video model on procedurally generated interface recordings, where the ground truth motion is exactly known because a program produced it.</p>
+
+      <p>Every fine-tuned variant beat the base model on PSNR. Every one of them also drifted away from the true amount of motion, and the longer I trained, the worse it got — one scene ended up moving <em>less</em> than the ground truth by about a fifth, while its PSNR stayed comfortably above baseline.</p>
+
+      <p>Which is exactly what you would predict. Under a reconstruction loss, when the model is uncertain about where the cursor goes next, the loss-minimizing move is to average over the possibilities: move less, blur the transition. PSNR is nearly blind to that, because a smooth wrong answer is numerically close to the right one. So the intermediate states — the cursor travelling, the characters appearing one at a time — quietly disappear while the score improves.</p>
+
+      <p>Two metrics, read together, or neither. PSNR alone says the model got better. Motion-versus-ground-truth says it learned to stand still more convincingly.</p>
+
+      <h2 id="rules">What I do now</h2>
+
+      <p>Not principles, just habits that came out of the above:</p>
+
+      <ul>
+        <li><b>Put the do-nothing baseline in the table.</b> Frozen frame, copy the input, predict the majority class. If it scores well, the metric is not measuring what its name says.</li>
+        <li><b>If two classes overlap on a number, that number does not get a threshold.</b> Report it, judge on the artefact.</li>
+        <li><b>Check the instrument's resolution before believing a null.</b> Crop to the effect. Match the measurement's scale to the thing's scale.</li>
+        <li><b>Subtract the background's own drift.</b> When I measure whether clothing keeps its colour, raw chroma is useless, because the whole picture brightening counts as the shirt keeping its colour, and hue angle is blind to something fading toward grey. What works is a ratio, folded so that "more saturated" is also a deviation — $\big|\log_2 (S/S_0)\big|$ with $S = C^*/L^*$ — plus a difference-in-differences residual against the background.</li>
+        <li><b>Never use an unsigned path length as a motion measure.</b> On a low-texture static shot it is the length of a random walk, and it will rank a frozen clip above a genuine camera move. Use net displacement and net scale change.</li>
+        <li><b>Sample densely and report when the failure peaked.</b> One clip of mine went navy, to brown around 45–52 s, and back to navy by 59 s. Comparing the first and last frames gives it full marks.</li>
+        <li><b>Draw the measurement box on the image and look at it.</b> Twice this summer a detector was confidently measuring the wrong pixels, once reporting faces in grass and sandstone. Both times I found it by rendering the box, not by reading the number.</li>
+      </ul>
+
+      <p>None of this is free. Every one of these instruments cost days that produced no result, and none of them will appear as a contribution anywhere. But the alternative is a table full of numbers that all point the same, flattering, wrong way — and the reviewer who finds that out is going to be less generous about it than I am.</p>
+
+      <div class="post-foot">
+        <a href="../index.html#writing">← All writing</a>
+        <a href="the-latent-cell.html">Next: The latent cell →</a>
+      </div>
+    </article>
+
+    <script>
+      const tb = document.getElementById("topbar");
+      addEventListener("scroll", () => tb.classList.toggle("scrolled", scrollY > 8), { passive: true });
+      const links = [...document.querySelectorAll(".toc a")];
+      const ids = links.map((a) => a.getAttribute("href").slice(1));
+      const spy = new IntersectionObserver((es) => {
+        es.forEach((e) => { if (e.isIntersecting) {
+          links.forEach((l) => l.classList.remove("active"));
+          const a = links.find((l) => l.getAttribute("href") === "#" + e.target.id);
+          if (a) a.classList.add("active");
+        }});
+      }, { rootMargin: "-70px 0px -70% 0px" });
+      ids.forEach((id) => { const el = document.getElementById(id); if (el) spy.observe(el); });
+    </script>
+  </body>
+</html>

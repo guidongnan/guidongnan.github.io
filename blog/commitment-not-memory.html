@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <title>Your video model does not need a better memory. It needs to commit. · Dongnan Gui</title>
+    <meta name="description" content="Long-video drift is usually treated as a retrieval problem. I argue it is a commitment problem, show why compressing the past cannot remove square-root-in-T drift, retract the write gate I proposed last month, and give the experiment that would prove me wrong." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;450;500;600&family=JetBrains+Mono:wght@400;500&family=Noto+Serif+SC:wght@500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="blog.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" />
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"
+      onload="renderMathInElement(document.body,{delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}],throwOnError:false})"></script>
+  </head>
+  <body>
+    <header class="topbar" id="topbar">
+      <a class="home" href="../index.html">Dongnan Gui</a>
+      <a href="../index.html#writing">← All writing</a>
+      <a href="commitment-not-memory.zh.html">中文</a>
+    </header>
+
+    <nav class="toc" id="toc">
+      <div class="toc-h">Contents</div>
+      <a href="#three">Three things we call memory</a>
+      <a href="#drift">Why compression cannot fix drift</a>
+      <a href="#retract">Retracting my own write gate</a>
+      <a href="#taxonomy">A taxonomy that predicts something</a>
+      <a href="#blind">Why our metrics are blind to this</a>
+      <a href="#layer">What a commitment layer looks like</a>
+      <a href="#wrong">How to prove me wrong</a>
+      <a href="#believe">What I actually believe</a>
+    </nav>
+
+    <article>
+      <div class="post-head">
+        <div class="kicker">Notes on video generation</div>
+        <h1>Your video model does not need a better memory. It needs to commit.</h1>
+        <div class="meta">
+          <span>August 2026</span><span class="dot"></span>
+          <span>~14 min</span><span class="dot"></span>
+          <span>autoregressive video · drift · evaluation</span>
+        </div>
+      </div>
+
+      <p class="lead">Last month I wrote that memory, not context, is the bottleneck in long video. I now think that post was half right in the way that is most expensive: right about the diagnosis, wrong about the cure. Compressing the past does not stop a world from drifting. Nothing that only summarizes what already happened can.</p>
+
+      <p>Here is the claim I want to defend, and the arithmetic that makes it more than a slogan: <b>long-video incoherence is not a retrieval failure, it is a commitment failure.</b> The model does not lose the fact that the sofa was blue. It never bound itself to the sofa being blue in the first place, so there was nothing to lose — only something to re-guess, three hundred times, each guess conditioned on the last one.</p>
+
+      <h2 id="three">Three things we call memory</h2>
+
+      <p>Almost every argument about long video collapses three different quantities into the word <em>memory</em>. Pulling them apart is most of the work.</p>
+
+      <div class="tbl-wrap">
+        <table>
+          <thead>
+            <tr><th>Quantity</th><th>What it is</th><th>Size</th><th>What it costs to grow</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><b>The record</b></td><td>What was actually rendered: latents, tokens, the KV cache</td><td>$\mathcal{O}(T)$ and enormous</td><td>Memory bandwidth</td></tr>
+            <tr><td><b>The reach</b></td><td>How far back attention is allowed to look</td><td>A hyperparameter</td><td>Attention compute</td></tr>
+            <tr><td><b>The commitment</b></td><td>The facts the model has bound itself to: identity, layout, palette, where the light comes from</td><td>Tiny, maybe $10^2$ numbers</td><td>Nothing. It is not represented at all.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>Long-context work buys <em>reach</em> over <em>the record</em>. Compressed-memory work, including my own, buys a cheaper <em>record</em>. Neither of them represents a <em>commitment</em>, and I have come to think consistency is a property of commitments alone.</p>
+
+      <p>The distinction is not philosophical. It is the difference between recall and inference. If the blueness of the sofa lives only in the record, then every step the model must <em>re-derive</em> it by attending over pixels. Re-derivation is an inference, inference from a stochastic model is a sample, and samples move. Recall does not move; that is the entire point of recall.</p>
+
+      <h2 id="drift">Why compression cannot fix drift</h2>
+
+      <p>Let $c^\star \in \mathbb{R}^k$ stand for the small set of facts that must stay fixed for a clip to feel like one world. A model with no explicit carrier has to reconstruct it at every step from what it has already produced:</p>
+
+      $$ \hat c_t \;=\; f_\theta\!\left(x_{&lt;t}\right). $$
+
+      <p>Now notice the loop. The frames $x_{&lt;t}$ were themselves generated conditioned on $\hat c_{t-1}$, so they already embody last step's estimate, error included. The model is not measuring the world; it is measuring its own last opinion about the world. Write the increment as noise and you get</p>
+
+      $$ \hat c_{t+1} \;=\; \hat c_t + \eta_t, \qquad \mathbb{E}[\eta_t] = 0, \quad \operatorname{Var}[\eta_t] = \sigma^2 I. $$
+
+      <p>That is a random walk with no restoring force, so</p>
+
+      $$ \mathbb{E}\big\lVert \hat c_T - c^\star \big\rVert^2 \;=\; k\,\sigma^2 T, \qquad \text{RMS drift} \;\propto\; \sigma\sqrt{T}. $$
+
+      <p>Here is the part that matters. Compressing the record changes $\sigma$ and nothing else. A compressor throws information away, so at best it leaves $\sigma$ alone and realistically it raises it. There is no value of $\sigma$ that turns $\sigma\sqrt{T}$ into a constant. <b>Record compression moves the constant; it cannot change the exponent.</b></p>
+
+      <div class="callout"><b>The load-bearing assumption.</b> This is a model, not a measurement. It assumes the per-step increment is zero-mean and roughly independent, which is what you get when nothing anchors the estimate. If a method supplies an anchor, the increments become correlated and the walk becomes a bounded process. That is exactly the property I am claiming distinguishes the two families, and it is the thing the experiment in the last section is designed to detect.</div>
+
+      <h2 id="retract">Retracting my own write gate</h2>
+
+      <p>In <a href="long-video-memory.html">the previous post</a> I proposed a per-slot write gate, and I still like the shape of it:</p>
+
+      $$ M_t \;=\; (1-\alpha)\,M_{t-1} + \alpha\,\tilde H_t, \qquad \alpha = \sigma\!\left(w^\top[\,M_{t-1};\,c_t\,]\right). $$
+
+      <p>Whether this helps depends entirely on what $\tilde H_t$ is, and I did not say. Both readings are defensible from that post, and only one of them works.</p>
+
+      <p><b>Reading one, anchored.</b> Suppose $\tilde H_t = c^\star + \epsilon_t$ with independent noise, that is, the write is driven by fresh external evidence. Then the update is an exponential filter and its steady-state variance is bounded:</p>
+
+      $$ \operatorname{Var}[M_\infty] \;=\; \frac{\alpha}{2-\alpha}\,\sigma^2 \;\xrightarrow[\ \alpha \to 0\ ]{}\; 0. $$
+
+      <p><b>Reading two, self-referential.</b> Suppose instead $\tilde H_t = M_{t-1} + \epsilon_t$, the write is summarized from frames the model itself just generated. Then</p>
+
+      $$ M_t \;=\; M_{t-1} + \alpha\,\epsilon_t \quad\Longrightarrow\quad \operatorname{Var}[M_t] \;=\; \alpha^2\sigma^2\,t, $$
+
+      <p>which is the same random walk, merely slowed by $\alpha^2$. A small gate buys time. It does not buy stability, and $\sqrt{T}$ is patient.</p>
+
+      <p>In an autoregressive generator with no external input after the first frame, reading two is the honest description of what is happening. So the gate I proposed is a variance reducer wearing the costume of a memory. I would rather say that plainly than let it stand.</p>
+
+      <h2 id="taxonomy">A taxonomy that predicts something</h2>
+
+      <p>Taxonomies are cheap. This one earns its place only because each row implies a different <em>shape</em> of failure curve, which means the table is falsifiable.</p>
+
+      <div class="tbl-wrap">
+        <table>
+          <thead>
+            <tr><th>Family</th><th>What is carried</th><th>Anchored to</th><th>Predicted revisit error vs. gap $\Delta$</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Truncation / sliding window <a href="#r1">[1]</a>, <a href="#r5">[5]</a></td><td>Recent record</td><td>Nothing past the window</td><td>Flat, then a cliff at the window edge</td></tr>
+            <tr><td>Record compression <a href="#r2">[2]</a>, and my own <a href="#r8">[8]</a></td><td>Lossy summary of the record</td><td>Its own past summary</td><td>$\propto\sqrt{\Delta}$, gentler slope</td></tr>
+            <tr><td>Fixed-size recurrent state <a href="#r4">[4]</a></td><td>A vector that is overwritten</td><td>Its own past state</td><td>$\propto\sqrt{\Delta}$</td></tr>
+            <tr><td>Latent world state <a href="#r3">[3]</a>, <a href="#r6">[6]</a></td><td>A learned state with dynamics</td><td>Observations, when they exist</td><td>Bounded while observed, drifts when imagining</td></tr>
+            <tr><td>Explicit geometry <a href="#r7">[7]</a>, <a href="#r9">[9]</a></td><td>A scene, not a summary</td><td>A coordinate frame</td><td>Bounded in $\Delta$; fails on the unmodelled</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>The interesting line in that table is the last column, because it says the families are not on a quality spectrum. They are on different curves. If you measure revisit error against gap and every method gives you the same curve shape with a different offset, my framework is wrong and the field's is right.</p>
+
+      <h2 id="blind">Why our metrics are blind to this</h2>
+
+      <p>There is a reason this argument has been easy to avoid: the standard automatic metrics cannot see drift, and some of them actively reward its opposite. Take the frame-consistency score that appears, in one dress or another, in most video benchmarks:</p>
+
+      $$ S \;=\; \frac{1}{T-1}\sum_{t=1}^{T-1} \cos\!\big(\phi(x_t),\, \phi(x_{t+1})\big), $$
+
+      <p>with $\phi$ some pretrained image encoder. Ask what maximizes it. A video that never changes gives $\phi(x_t) = \phi(x_{t+1})$ for every $t$, hence $S = 1$, the highest attainable value. <b>The global optimum of a consistency metric is a still image.</b></p>
+
+      <p>This is why the trivial baseline is not a formality. If you are reporting a consistency number, you owe the reader the frozen-frame score next to it, because that score is the ceiling and a model approaching it may be succeeding or may be dying. The metric cannot tell you which, and neither can the reader.</p>
+
+      <p>What would see drift is a metric that makes the camera come back. Define revisit error at gap $\Delta$ over poses $\pi$ that recur:</p>
+
+      $$ R(\Delta) \;=\; \mathbb{E}_{t,\;\pi_t = \pi_{t+\Delta}} \Big[\, d\big(x_t,\; x_{t+\Delta}\big) \,\Big]. $$
+
+      <p>$R$ has the property $S$ lacks: a frozen video scores perfectly on $R$ too, but it is trivially excluded by any motion or task metric reported alongside, whereas a frozen video scores perfectly on $S$ <em>and</em> looks superficially like success. The pair $\big(R(\Delta),\ \text{motion}\big)$ cannot be gamed by doing nothing in the way that $S$ alone can.</p>
+
+      <h2 id="layer">What a commitment layer looks like</h2>
+
+      <p>If the diagnosis is right, the design follows, and it inverts what I said last month. I claimed the hard part was learning what to forget. I now think the hard part is <b>learning what to refuse to change.</b></p>
+
+      <p>Concretely, replace the smooth gate with a decision. Keep slots $M^{(i)}$, and update slot $i$ only when incoming evidence actually contradicts it:</p>
+
+      $$ M^{(i)}_t \;=\; \begin{cases} \tilde H^{(i)}_t, & d\big(M^{(i)}_{t-1},\, \tilde H^{(i)}_t\big) > \tau \\[4pt] M^{(i)}_{t-1}, & \text{otherwise.} \end{cases} $$
+
+      <p>The point is the second branch. Exact equality, not a small step toward the new value. Under the random-walk model this is what removes the accumulation: increments below $\tau$ contribute nothing at all rather than contributing a little, so the walk cannot integrate its own noise. The cost is a hyperparameter with teeth. Set $\tau$ too high and the world can never legitimately change, which in a generative video model is a bad failure, because worlds are supposed to change.</p>
+
+      <p>That tension is the real research question, and I do not think it is a representation-learning question. It is a change-detection question, and change detection has a mature literature that the video generation community has mostly not read.</p>
+
+      <div class="callout"><b>Where the idea comes from.</b> The frame I keep returning to is that a single image already fixes far more of a world than it shows, which is the thesis of <a href="single-image-world.html">an earlier note</a> and of our work on generating interactive worlds from one image <a href="#r9">[9]</a>. If one frame determines that much, then the job of the following three hundred frames is mostly to <em>not contradict</em> it. That is a much narrower job than remembering them.</div>
+
+      <h2 id="wrong">How to prove me wrong</h2>
+
+      <p>I have not run this experiment. The numbers are not in, and I am not going to write a table of results I did not produce. What I can do is specify it tightly enough that it is worth someone's afternoon, including mine.</p>
+
+      <p><b>Setup.</b> Drive generation along closed camera trajectories so that pose $\pi$ recurs at a controlled gap $\Delta$. Sweep $\Delta$ across at least a decade, for example 8 to 256 frames. Report $R(\Delta)$ as defined above.</p>
+
+      <p><b>Baselines that must appear</b>, because without them the plot is unreadable:</p>
+      <ul>
+        <li><b>Frozen frame.</b> Repeat frame one for the whole clip. This is the ceiling for every consistency metric and the floor for every motion metric. If it is not on the plot, the plot is not evidence.</li>
+        <li><b>No memory.</b> A window of one, plus a strong decoder. This is the "looks fine for two seconds" control.</li>
+        <li><b>Oracle recall.</b> At each revisit, paste the first-visit frame. Scores near zero on $R$ by construction, and tells you how much of the remaining error is generation quality rather than drift.</li>
+      </ul>
+
+      <p><b>The prediction.</b> On log-log axes, record-compressors should give $\log R \approx \tfrac{1}{2}\log\Delta + b$, a slope near one half with the family differing only in $b$. A commitment mechanism should bend away from that line and flatten. If every method lies on a slope-one-half line and the only difference is the intercept, then the distinction I have drawn does not exist and this post is wrong in the way I would most like to know about.</p>
+
+      <p><b>What would make it inconclusive.</b> Too small a $\Delta$ range, since everything looks flat over one octave. A dataset where the camera never truly returns, which is most of them. And any metric whose encoder $\phi$ has not been calibrated against human judgement of "same place, same world" on the specific failure mode, since an uncalibrated $\phi$ can report agreement that no person would grant.</p>
+
+      <h2 id="believe">What I actually believe</h2>
+
+      <p>Attention is not the constraint. Nothing about a longer window makes a model decide that the sofa is blue and stay decided. The constraint is that our models have no representational slot whose semantics are <em>this does not change unless something contradicts it</em>, and no evaluation that would notice if they did.</p>
+
+      <p>I would rather be wrong in public about the exponent than keep publishing gentler slopes and calling them progress. If the revisit curve comes back flat for a compressor, I will say so here.</p>
+
+      <hr />
+      <div class="refs">
+        <h3>References</h3>
+        <ol>
+          <li id="r1">Dai, Z., Yang, Z., Yang, Y., Carbonell, J., Le, Q. V., &amp; Salakhutdinov, R. (2019). <a href="https://scholar.google.com/scholar?q=Transformer-XL+Attentive+Language+Models+Beyond+a+Fixed-Length+Context" target="_blank" rel="noopener">Transformer-XL: Attentive Language Models Beyond a Fixed-Length Context</a>. ACL.</li>
+          <li id="r2">Rae, J. W., Potapenko, A., Jayakumar, S. M., &amp; Lillicrap, T. P. (2020). <a href="https://scholar.google.com/scholar?q=Compressive+Transformers+for+Long-Range+Sequence+Modelling" target="_blank" rel="noopener">Compressive Transformers for Long-Range Sequence Modelling</a>. ICLR.</li>
+          <li id="r3">Ha, D., &amp; Schmidhuber, J. (2018). <a href="https://scholar.google.com/scholar?q=Recurrent+World+Models+Facilitate+Policy+Evolution" target="_blank" rel="noopener">World Models</a>. NeurIPS.</li>
+          <li id="r4">Gu, A., &amp; Dao, T. (2023). <a href="https://scholar.google.com/scholar?q=Mamba+Linear-Time+Sequence+Modeling+with+Selective+State+Spaces" target="_blank" rel="noopener">Mamba: Linear-Time Sequence Modeling with Selective State Spaces</a>.</li>
+          <li id="r5">Xiao, G., Tian, Y., Chen, B., Han, S., &amp; Lewis, M. (2024). <a href="https://scholar.google.com/scholar?q=Efficient+Streaming+Language+Models+with+Attention+Sinks" target="_blank" rel="noopener">Efficient Streaming Language Models with Attention Sinks</a>. ICLR.</li>
+          <li id="r6">Hafner, D., Pasukonis, J., Ba, J., &amp; Lillicrap, T. (2023). <a href="https://scholar.google.com/scholar?q=Mastering+Diverse+Domains+through+World+Models+DreamerV3" target="_blank" rel="noopener">Mastering Diverse Domains through World Models (DreamerV3)</a>.</li>
+          <li id="r7">Mildenhall, B., Srinivasan, P. P., Tancik, M., Barron, J. T., Ramamoorthi, R., &amp; Ng, R. (2020). <a href="https://scholar.google.com/scholar?q=NeRF+Representing+Scenes+as+Neural+Radiance+Fields+for+View+Synthesis" target="_blank" rel="noopener">NeRF: Representing Scenes as Neural Radiance Fields for View Synthesis</a>. ECCV.</li>
+          <li id="r8">Gui, D., Guo, X., Zhou, W., &amp; Lu, Y. <a href="https://scholar.google.com/scholar?q=Learnable+Compressed+Memory+for+Autoregressive+Video+Generation" target="_blank" rel="noopener">Learnable Compressed Memory for Autoregressive Video Generation</a>. Under review.</li>
+          <li id="r9">Gui, D., Guo, X., Zhou, W., &amp; Lu, Y. (2025). <a href="https://openreview.net/forum?id=PA47sKU8CU" target="_blank" rel="noopener">Image as a World: Generating Interactive World from Single Image via Panoramic Video Generation</a>. NeurIPS.</li>
+        </ol>
+      </div>
+
+      <div class="post-foot">
+        <a href="long-video-memory.html">← Previously: Memory, not context</a>
+        <a href="single-image-world.html">Next: A single image is already a world →</a>
+      </div>
+    </article>
+
+    <script>
+      const tb = document.getElementById("topbar");
+      addEventListener("scroll", () => tb.classList.toggle("scrolled", scrollY > 8), { passive: true });
+      const links = [...document.querySelectorAll(".toc a")];
+      const ids = links.map((a) => a.getAttribute("href").slice(1));
+      const spy = new IntersectionObserver((es) => {
+        es.forEach((e) => { if (e.isIntersecting) {
+          links.forEach((l) => l.classList.remove("active"));
+          const a = links.find((l) => l.getAttribute("href") === "#" + e.target.id);
+          if (a) a.classList.add("active");
+        }});
+      }, { rootMargin: "-70px 0px -70% 0px" });
+      ids.forEach((id) => { const el = document.getElementById(id); if (el) spy.observe(el); });
+    </script>
+  </body>
+</html>

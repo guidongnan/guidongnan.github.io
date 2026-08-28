@@ -1,0 +1,637 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <title>Dongnan Gui</title>
+    <meta name="description" content="Dongnan Gui (桂栋南) — USTC–MSRA joint Ph.D. student, working on video generation and world models." />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400;1,9..144,500&family=Inter:wght@400;450;500;600&family=Noto+Serif+SC:wght@500;600&family=Noto+Serif+Tibetan:wght@500&family=Noto+Naskh+Arabic:wght@500&family=Noto+Serif:ital,wght@0,500;1,500&family=Noto+Serif+Devanagari:wght@500&family=Noto+Serif+JP:wght@500&display=swap"
+      rel="stylesheet"
+    />
+
+    <style>
+      :root {
+        --bg: #ffffff;
+        --panel: #f6f6f8;
+        --ink: #16161a;
+        --soft: #3c3c44;
+        --muted: #8b8b95;
+        --line: #ececef;
+        --line-2: #e2e2e7;
+        --accent: #4b41d8;
+        --accent-ink: #3a31b8;
+        --shadow: 0 2px 4px rgba(20, 20, 40, 0.03), 0 20px 50px -26px rgba(20, 20, 50, 0.22);
+        --serif: "Fraunces", "Noto Serif SC", Georgia, serif;
+        --sans: "Inter", system-ui, -apple-system, "Segoe UI", "Noto Sans SC", sans-serif;
+        --wide: 1100px;
+        --measure: 66ch;
+      }
+      /* on 1366-class laptops, give the column back some width so the margin notes still fit */
+      @media (max-width: 1400px) { :root { --wide: 1020px; } }
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font-family: var(--sans);
+        font-size: 17px;
+        line-height: 1.68;
+        letter-spacing: 0.003em;
+        -webkit-font-smoothing: antialiased;
+        text-rendering: optimizeLegibility;
+      }
+      a { color: inherit; }
+      ::selection { background: color-mix(in srgb, var(--accent) 18%, transparent); }
+
+      /* nav */
+      nav {
+        position: sticky; top: 0; z-index: 30;
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 16px clamp(22px, 6vw, 60px);
+        background: color-mix(in srgb, var(--bg) 82%, transparent);
+        backdrop-filter: saturate(1.4) blur(12px);
+        border-bottom: 1px solid transparent;
+        transition: border-color 0.3s;
+      }
+      nav.scrolled { border-bottom-color: var(--line); }
+      .brand { font-family: var(--serif); font-weight: 600; font-size: 17px; text-decoration: none; display: inline-flex; gap: 9px; align-items: baseline; }
+      .brand .zh { font-family: "Noto Serif SC", serif; font-size: 13.5px; color: var(--muted); font-weight: 500; }
+      .nav-links { display: flex; gap: 30px; }
+      .nav-links a { text-decoration: none; font-size: 13.5px; font-weight: 500; color: var(--muted); letter-spacing: 0.01em; transition: color 0.2s; }
+      .nav-links a:hover { color: var(--ink); }
+      /* on phones the links move to their own row and scroll sideways rather than disappearing */
+      @media (max-width: 680px) {
+        nav { flex-wrap: wrap; row-gap: 10px; padding: 12px 18px; }
+        .brand { width: 100%; }
+        .nav-links {
+          width: 100%; gap: 18px; overflow-x: auto; scrollbar-width: none;
+          -webkit-overflow-scrolling: touch;
+        }
+        .nav-links::-webkit-scrollbar { display: none; }
+        .nav-links a { font-size: 13px; white-space: nowrap; }
+      }
+
+      .wrap { max-width: var(--wide); margin: 0 auto; padding: 0 clamp(22px, 6vw, 60px); position: relative; z-index: 1; }
+      section { padding: 60px 0; border-top: 1px solid var(--line); }
+      .measure { max-width: var(--measure); }
+
+      .label {
+        display: inline-flex; align-items: center; gap: 11px;
+        font-size: 11.5px; font-weight: 600; letter-spacing: 0.2em; text-transform: uppercase;
+        color: var(--muted); margin: 0 0 28px;
+      }
+      .label::before { content: ""; width: 20px; height: 2px; background: var(--accent); }
+
+      /* hero */
+      .hero { padding: clamp(58px, 10vw, 118px) 0 66px; }
+      .eyebrow { font-size: 14px; font-weight: 500; letter-spacing: 0.02em; color: var(--accent-ink); margin: 0 0 20px; }
+      h1 { font-family: var(--serif); font-weight: 600; font-size: clamp(48px, 9vw, 92px); line-height: 0.98; letter-spacing: -0.025em; margin: 0; }
+      h1 .zh { font-family: "Noto Serif SC", serif; font-weight: 500; font-size: 0.32em; color: var(--muted); letter-spacing: 0.05em; margin-left: 0.4em; vertical-align: 0.22em; }
+      .role { font-size: 18px; color: var(--soft); margin: 22px 0 0; }
+      .role b { color: var(--ink); font-weight: 600; }
+      .role .jp { color: var(--accent-ink); font-weight: 600; font-size: 21px; letter-spacing: 0.004em; }
+      .affil { font-size: 15.5px; color: var(--muted); margin: 10px 0 0; }
+      .affil b { color: var(--soft); font-weight: 500; }
+
+      .sign { font-family: var(--serif); font-style: italic; font-size: 16px; line-height: 1.55; color: var(--muted); max-width: 48ch; margin: 0 0 28px; }
+      .links { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 34px; }
+      .links a {
+        display: inline-flex; align-items: center; gap: 8px; text-decoration: none;
+        font-size: 14px; font-weight: 500; padding: 9px 16px; border-radius: 999px;
+        border: 1px solid var(--line-2); color: var(--soft); background: var(--bg);
+        transition: transform 0.18s, border-color 0.2s, color 0.2s, box-shadow 0.2s;
+      }
+      .links a:hover { color: var(--accent-ink); border-color: color-mix(in srgb, var(--accent) 45%, var(--line-2)); transform: translateY(-2px); box-shadow: var(--shadow); }
+      .links svg { width: 15px; height: 15px; }
+
+      p.body { margin: 0 0 18px; color: var(--soft); }
+      p.body:last-child { margin-bottom: 0; }
+      p.body b { color: var(--ink); font-weight: 600; }
+
+      .tags { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 30px; }
+      .tag { font-size: 14px; font-weight: 500; padding: 7px 15px; border-radius: 999px; border: 1px solid var(--line-2); color: var(--soft); background: var(--panel); }
+
+      /* work gallery */
+      .grid { display: flex; flex-direction: column; gap: 42px; }
+      @media (max-width: 760px) { .grid { gap: 30px; } }
+      .work { display: grid; grid-template-columns: minmax(0, 0.95fr) minmax(0, 1fr); gap: 34px; align-items: center; text-decoration: none; }
+      @media (max-width: 760px) { .work { grid-template-columns: 1fr; gap: 18px; } }
+      .shot {
+        position: relative; display: block; aspect-ratio: 16 / 10; overflow: hidden;
+        border-radius: 14px; border: 1px solid var(--line-2); background: var(--panel);
+        transition: border-color 0.25s, box-shadow 0.25s, transform 0.25s;
+      }
+      .shot .ph {
+        position: absolute; inset: 0; display: none; align-items: center; justify-content: center;
+        font-family: var(--serif); font-weight: 500; font-size: 15px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted);
+        background:
+          radial-gradient(120% 120% at 20% 0%, color-mix(in srgb, var(--accent) 9%, transparent), transparent 55%),
+          linear-gradient(150deg, #fbfbfd, #f0f0f4);
+      }
+      .shot.empty .ph { display: flex; }
+      .shot img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: #fff; display: block; }
+      .work:hover .shot { border-color: color-mix(in srgb, var(--accent) 34%, var(--line-2)); box-shadow: var(--shadow); transform: translateY(-3px); }
+      .work-body { padding: 0; }
+      .work-desc { display: block; margin-top: 11px; font-size: 15px; line-height: 1.62; color: var(--soft); max-width: 58ch; }
+      .venue { display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent-ink); background: color-mix(in srgb, var(--accent) 8%, transparent); border: 1px solid color-mix(in srgb, var(--accent) 20%, transparent); padding: 3px 9px; border-radius: 6px; }
+      .venue.review { color: var(--muted); background: transparent; border-color: var(--line-2); }
+      .venue.core { margin-left: 7px; color: #fff; background: var(--accent); border-color: var(--accent); }
+      .work-title { display: block; font-family: var(--serif); font-weight: 500; font-size: 20px; line-height: 1.28; letter-spacing: -0.008em; margin: 12px 0 7px; color: var(--ink); }
+      .work:hover .work-title { color: var(--accent-ink); }
+      .authors { font-size: 14px; color: var(--muted); }
+      .authors b { color: var(--soft); font-weight: 600; }
+      .authors .eq { color: var(--accent-ink); }
+
+      /* projects */
+      .proj { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 36px; align-items: center; text-decoration: none; }
+      @media (max-width: 760px) { .proj { grid-template-columns: 1fr; gap: 20px; } }
+      .proj-shot {
+        position: relative; display: block; aspect-ratio: 16 / 10; overflow: hidden;
+        border-radius: 14px; border: 1px solid var(--line-2); background: var(--panel);
+        transition: border-color 0.25s, box-shadow 0.25s, transform 0.25s;
+      }
+      .proj-shot img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: top center; display: block; }
+      .proj:hover .proj-shot { border-color: color-mix(in srgb, var(--accent) 34%, var(--line-2)); box-shadow: var(--shadow); transform: translateY(-3px); }
+      .proj-body { display: block; }
+      .kind { display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent-ink); background: color-mix(in srgb, var(--accent) 8%, transparent); border: 1px solid color-mix(in srgb, var(--accent) 20%, transparent); padding: 3px 9px; border-radius: 6px; }
+      .proj-title { display: block; font-family: var(--serif); font-weight: 500; font-size: 23px; line-height: 1.25; letter-spacing: -0.01em; margin: 12px 0 8px; color: var(--ink); transition: color 0.2s; }
+      .proj-title .zh-sub { font-family: "Noto Serif SC", serif; font-size: 16px; color: var(--muted); margin-left: 9px; font-weight: 400; white-space: nowrap; }
+      .proj:hover .proj-title { color: var(--accent-ink); }
+      .proj-desc { display: block; font-size: 15.5px; color: var(--soft); max-width: 54ch; }
+      .proj-facts { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 14px; }
+      .proj-facts span { font-size: 12.5px; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; font-variant-numeric: tabular-nums; }
+      .proj + .proj { margin-top: 46px; }
+      .proj + .proj .proj-shot { order: 2; }
+      .kind.quiet { color: var(--muted); background: transparent; border-color: var(--line-2); }
+
+      /* timeline */
+      .entry { display: grid; grid-template-columns: 150px 1fr; gap: 26px; padding: 20px 0; border-top: 1px solid var(--line); }
+      .entry:first-of-type { border-top: 0; }
+      .entry .when { font-size: 13.5px; color: var(--muted); font-variant-numeric: tabular-nums; padding-top: 3px; }
+      .entry h3 { font-family: var(--serif); font-weight: 600; font-size: 18px; margin: 0 0 3px; }
+      .entry .org { font-size: 14.5px; color: var(--accent-ink); font-weight: 500; margin: 0 0 7px; }
+      .entry p { margin: 0; font-size: 15px; color: var(--soft); max-width: 60ch; }
+      .entry .meta { font-size: 13.5px; color: var(--muted); margin-top: 5px; }
+      @media (max-width: 600px) { .entry { grid-template-columns: 1fr; gap: 5px; } .entry .when { padding-top: 0; } }
+
+      /* footer */
+      footer { border-top: 1px solid var(--line); padding: 44px 0 72px; }
+      .colophon { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; font-size: 13px; color: var(--muted); }
+      .colophon a { color: var(--muted); text-decoration: none; }
+      .colophon a:hover { color: var(--accent-ink); }
+
+      /* ambient background: cursor glow + drifting multilingual quotes */
+      .ambience { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
+      .orb { position: fixed; top: 0; left: 0; width: 620px; height: 620px; margin: -310px 0 0 -310px; border-radius: 50%; pointer-events: none; background: radial-gradient(circle at center, color-mix(in srgb, var(--accent) 8%, transparent), transparent 66%); opacity: 0.6; will-change: transform; }
+      .quotes { position: absolute; top: 0; left: 0; width: 100%; z-index: 0; pointer-events: none; }
+      @keyframes q-life { 0% { opacity: 0; transform: translateY(20px); } 16% { opacity: 0.26; } 78% { opacity: 0.26; } 100% { opacity: 0; transform: translateY(-34px); } }
+      @keyframes q-fade { 0% { opacity: 0; } 16% { opacity: 0.26; } 78% { opacity: 0.26; } 100% { opacity: 0; } }
+      .q { position: absolute; font-family: var(--serif); font-size: 15px; line-height: 1.8; color: var(--muted); opacity: 0; pointer-events: auto; cursor: pointer; user-select: none; -webkit-user-select: none; will-change: transform, opacity; animation: q-life 24s linear forwards; }
+      .q.qs-l { text-align: right; }
+      .q.qs-r { text-align: left; }
+      /* only CJK sets vertically; every other script reads as a horizontal margin note */
+      .q-zh, .q-ja { writing-mode: vertical-rl; text-orientation: mixed; max-height: 64vh; line-height: 2.05; }
+      .q-zh { font-family: "Noto Serif SC", serif; font-size: 17px; letter-spacing: 0.12em; }
+      .q-ja { font-family: "Noto Serif JP", serif; font-size: 17px; letter-spacing: 0.12em; }
+      .q-en, .q-la, .q-de, .q-fr { font-style: italic; font-size: 14px; }
+      .q-el { font-family: "Noto Serif", serif; font-style: italic; font-size: 14.5px; }
+      .q-sa { font-family: "Noto Serif Devanagari", serif; font-size: 15px; line-height: 1.95; }
+      .q-bo { font-family: "Noto Serif Tibetan", serif; font-size: 17px; line-height: 2.1; }
+      .q-ar, .q-fa { font-family: "Noto Naskh Arabic", serif; direction: rtl; font-size: 16px; line-height: 2; }
+      .q-tip { position: absolute; writing-mode: horizontal-tb; text-orientation: mixed; direction: ltr; text-align: left; top: 0; width: max-content; max-width: 15rem; font-family: var(--sans); font-style: normal; font-weight: 500; font-size: 12.5px; line-height: 1.5; letter-spacing: 0; color: var(--soft); background: var(--panel); border: 1px solid var(--line-2); border-radius: 10px; padding: 8px 11px; box-shadow: 0 10px 30px rgba(20, 20, 30, 0.1); opacity: 0; transition: opacity 0.25s ease; pointer-events: none; }
+      .q-g1 { display: block; }
+      .q-g2 { display: block; margin-top: 5px; padding-top: 5px; border-top: 1px solid var(--line); color: var(--muted); font-size: 11.5px; font-style: italic; }
+      .q.qs-l .q-tip { left: 100%; margin-left: 14px; }
+      .q.qs-r .q-tip { right: 100%; margin-right: 14px; }
+      .q:hover { animation-play-state: paused; opacity: 0.95 !important; color: var(--soft); }
+      .q:hover .q-tip { opacity: 1; }
+      @media (max-width: 1280px) { .q { display: none; } }
+      @media (prefers-reduced-motion: reduce) { .orb { display: none; } .q { animation-name: q-fade; } }
+
+      .reveal { opacity: 0; transform: translateY(16px); transition: opacity 0.75s cubic-bezier(0.2, 0.7, 0.2, 1), transform 0.75s cubic-bezier(0.2, 0.7, 0.2, 1); }
+      .reveal.in { opacity: 1; transform: none; }
+      @media (prefers-reduced-motion: reduce) { .reveal { opacity: 1; transform: none; transition: none; } html { scroll-behavior: auto; } }
+    </style>
+  </head>
+
+  <body>
+    <div class="ambience" aria-hidden="true">
+      <div class="orb"></div>
+    </div>
+    <div class="quotes" aria-hidden="true"></div>
+    <nav id="nav">
+      <a class="brand" href="#top">Dongnan Gui <span class="zh">桂栋南</span></a>
+      <div class="nav-links">
+        <a href="#about">About</a>
+        <a href="#work">Work</a>
+        <a href="#projects">Projects</a>
+        <a href="#cv">CV</a>
+        <a href="#contact">Contact</a>
+        <a href="index.zh.html">中文</a>
+      </div>
+    </nav>
+
+    <div class="wrap">
+      <!-- HERO -->
+      <header class="hero" id="top">
+        <h1 class="reveal">Dongnan&nbsp;Gui<span class="zh">桂栋南</span></h1>
+        <p class="role reveal"><b class="jp">USTC&ndash;MSRA Joint Ph.D.</b></p>
+        <p class="affil reveal"><b>University of Science and Technology of China</b> &nbsp;·&nbsp; <b>Microsoft Research Asia</b></p>
+        <div class="tags reveal">
+          <span class="tag">Video Generation</span>
+          <span class="tag">World Models</span>
+          <span class="tag">Autoregressive &amp; Diffusion Models</span>
+          <span class="tag">Long-term Memory</span>
+          <span class="tag">Controllable &amp; Trustworthy Generation</span>
+        </div>
+        <div class="links reveal">
+          <a href="mailto:dongnangui@mail.ustc.edu.cn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>Email</a>
+          <a href="https://github.com/guidongnan" target="_blank" rel="noopener">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.58 2 12.25c0 4.53 2.87 8.37 6.84 9.73.5.1.68-.22.68-.49v-1.7c-2.78.62-3.37-1.37-3.37-1.37-.46-1.18-1.11-1.5-1.11-1.5-.9-.64.07-.62.07-.62 1 .07 1.53 1.05 1.53 1.05.9 1.56 2.34 1.11 2.91.85.09-.66.35-1.11.63-1.37-2.22-.26-4.55-1.14-4.55-5.06 0-1.12.39-2.03 1.03-2.75-.1-.26-.45-1.3.1-2.71 0 0 .84-.28 2.75 1.05a9.4 9.4 0 0 1 5 0c1.91-1.33 2.75-1.05 2.75-1.05.55 1.41.2 2.45.1 2.71.64.72 1.03 1.63 1.03 2.75 0 3.93-2.34 4.79-4.57 5.05.36.32.68.94.68 1.9v2.81c0 .27.18.6.69.49A10.26 10.26 0 0 0 22 12.25C22 6.58 17.52 2 12 2Z"/></svg>GitHub</a>
+          <a href="https://scholar.google.com/citations?user=shLKvwcAAAAJ&amp;hl=en" target="_blank" rel="noopener">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3 1 9l11 6 9-4.91V17h2V9L12 3Z"/></svg>Scholar</a>
+        </div>
+      </header>
+
+      <!-- ABOUT -->
+      <section id="about">
+        <p class="label reveal">About</p>
+        <div class="measure reveal">
+          <p class="body">
+            I am a Ph.D. student in the <b>USTC&ndash;MSRA joint Ph.D. program</b>, based at the
+            <b>University of Science and Technology of China</b> and doing my research at
+            <b>Microsoft Research Asia</b>. I work on <b>video generation</b>,
+            <b>autoregressive video</b> and <b>world models</b>.
+          </p>
+          <p class="body">
+            What attracts me is building something that did not exist before. In generative
+            video that is rarely a matter of tuning numbers; the capability is missing
+            outright, and the work is to invent the mechanism that makes it possible at all.
+            What I am after is using algorithms to generate visual experience that is richer
+            and stranger than anything a camera can record.
+          </p>
+        </div>
+      </section>
+
+      <!-- WORK / PUBLICATIONS gallery -->
+      <section id="work">
+        <p class="label reveal">Selected Work</p>
+        <div class="grid">
+          <a class="work reveal" href="https://openreview.net/forum?id=PA47sKU8CU" target="_blank" rel="noopener">
+            <span class="shot empty"><span class="ph">NeurIPS 2025</span><img src="figs/world.jpg" alt="Image as a World teaser" loading="lazy" onload="this.parentElement.classList.remove('empty')" onerror="this.remove()" /></span>
+            <span class="work-body">
+              <span class="venue">NeurIPS 2025</span>
+              <span class="work-title">Image as a World: Generating Interactive World from Single Image via Panoramic Video Generation</span>
+              <span class="authors"><b>Dongnan Gui</b>, Xun Guo, Wengang Zhou, Yan Lu</span>
+              <span class="work-desc">One photo becomes a world you can look around in: a panoramic video initialises the scene, a rotation module turns the camera, a continuation model extends it. The hard axis is consistency, not fidelity.</span>
+            </span>
+          </a>
+
+          <a class="work reveal" href="https://openaccess.thecvf.com/content/CVPR2025/html/Gui_I2VGuard_Safeguarding_Images_against_Misuse_in_Diffusion-based_Image-to-Video_Models_CVPR_2025_paper.html" target="_blank" rel="noopener">
+            <span class="shot empty"><span class="ph">CVPR 2025</span><img src="figs/i2vguard.jpg" alt="I2VGuard teaser" loading="lazy" onload="this.parentElement.classList.remove('empty')" onerror="this.remove()" /></span>
+            <span class="work-body">
+              <span class="venue">CVPR 2025</span>
+              <span class="work-title">I2VGuard: Safeguarding Images against Misuse in Diffusion-based Image-to-Video Models</span>
+              <span class="authors"><b>Dongnan Gui</b>, Xun Guo, Wengang Zhou, Yan Lu</span>
+              <span class="work-desc">An imperceptible perturbation that wrecks whatever video a white-box image-to-video model makes from your photo. It attacks the image features and the attention maps that carry motion. Shown on SVD, CogVideoX and ControlNeXt.</span>
+            </span>
+          </a>
+
+          <a class="work reveal" href="https://arxiv.org/abs/2305.18259" target="_blank" rel="noopener">
+            <span class="shot empty"><span class="ph">NeurIPS 2023</span><img src="figs/glyphcontrol-arch.png" alt="The GlyphControl training pipeline: OCR engine and glyph render feed a Glyph ControlNet alongside a locked Stable Diffusion U-Net" loading="lazy" onload="this.parentElement.classList.remove('empty')" onerror="this.remove()" /></span>
+            <span class="work-body">
+              <span class="venue">NeurIPS 2023</span>
+              <span class="work-title">GlyphControl: Glyph Conditional Control for Visual Text Generation</span>
+              <span class="authors">Yukang Yang<span class="eq">*</span>, <b>Dongnan Gui</b><span class="eq">*</span>, Yuhui Yuan, Haisong Ding, Han Hu, Kai Chen<span class="venue core">Core contributor</span></span>
+              <span class="work-desc">Legible text in a generated image without retraining the generator: the words are rendered to a glyph image and fed to a ControlNet beside a frozen Stable Diffusion. Ships LAION-Glyph, a 10M-pair benchmark.</span>
+            </span>
+          </a>
+
+          <a class="work reveal" href="https://arxiv.org/abs/2305.15660" target="_blank" rel="noopener">
+            <span class="shot empty"><span class="ph">ICDAR 2023 · Oral</span><img src="figs/hccr.jpg" alt="DDPM for HCCR teaser" loading="lazy" onload="this.parentElement.classList.remove('empty')" onerror="this.remove()" /></span>
+            <span class="work-body">
+              <span class="venue">ICDAR 2023 · Oral</span>
+              <span class="work-title">Zero-shot Generation of Training Data with Denoising Diffusion Probabilistic Model for Handwritten Chinese Character Recognition</span>
+              <span class="authors"><b>Dongnan Gui</b>, Kai Chen, Haisong Ding, Qiang Huo</span>
+              <span class="work-desc">Chinese has 80,000+ character categories, most of them rare. A DDPM maps printed glyphs to handwritten strokes; on CASIA-HWDB, recognisers trained on the synthetic samples match those trained on real ones.</span>
+            </span>
+          </a>
+
+          <a class="work reveal" href="https://arxiv.org/abs/2607.19064" target="_blank" rel="noopener">
+            <span class="shot empty"><span class="ph">Preprint</span><img src="figs/mageflow.jpg" alt="A gallery of images generated by Mage-Flow" loading="lazy" onload="this.parentElement.classList.remove('empty')" onerror="this.remove()" /></span>
+            <span class="work-body">
+              <span class="venue review">Preprint</span>
+              <span class="work-title">Mage-Flow: An Efficient Native-Resolution Foundation Model for Image Generation and Editing</span>
+              <span class="authors">Xinjie Zhang, Peng Zhang, Shicheng Zheng, … <b>Dongnan Gui</b> … Yan Lu &nbsp;(24 authors)</span>
+              <span class="work-desc">A compact 4B stack for text-to-image generation and instruction editing, built from a lightweight tokenizer and a native-resolution diffusion transformer. Its 4-step Turbo variants do 1024² in 0.59 s on one A100.</span>
+            </span>
+          </a>
+        </div>
+      </section>
+
+      <!-- PROJECTS -->
+      <section id="projects">
+        <p class="label reveal">Projects</p>
+        <a class="proj reveal" href="notes/en/">
+          <span class="proj-shot"><img src="figs/tutorials-en.jpg" alt="The English edition of the tutorial site" /></span>
+          <span class="proj-body">
+            <span class="kind">Study material</span>
+            <span class="proj-title">Domain tutorials for the topics I follow<span class="zh-sub">领域教程与学习资料</span></span>
+            <span class="proj-desc">My reading notes, rewritten as something teachable. Thirteen long-form tutorials, one per sub-field I actually work in or track, each built from first principles up to the current frontier. Every claim in them points back to a specific paper I have read and written up.</span>
+            <span class="proj-facts"><span>13 tutorials</span><span>1,188 paper notes</span><span>math + diagrams</span><span>free · no login</span></span>
+          </span>
+        </a>
+
+        <a class="proj reveal" href="waypoints/">
+          <span class="proj-shot"><img src="figs/waypoints.jpg" alt="The Waypoints map with landmark markers" /></span>
+          <span class="proj-body">
+            <span class="kind quiet">Personal</span>
+            <span class="proj-title">Waypoints<span class="zh-sub">行迹</span></span>
+            <span class="proj-desc">An atlas of everywhere I have been, built from an Android app I wrote that reads the GPS out of my own photo library, clusters the points into places, and chooses each place's cover by scoring the photographs rather than by filename.</span>
+            <span class="proj-facts"><span>244 places</span><span>Kotlin + Leaflet</span><span>encrypted client-side</span></span>
+          </span>
+        </a>
+      </section>
+
+      <!-- CV -->
+      <section id="cv">
+        <p class="label reveal">Education &amp; Experience</p>
+        <div class="reveal">
+          <div class="entry">
+            <div class="when">2024 — Present</div>
+            <div>
+              <h3>Research Intern</h3>
+              <p class="org">Microsoft Research Asia</p>
+              <p>Video generation, world models and image editing.</p>
+            </div>
+          </div>
+          <div class="entry">
+            <div class="when">2023 — 2028</div>
+            <div>
+              <h3>Ph.D. Student &nbsp;·&nbsp; USTC&ndash;MSRA Joint Ph.D. Program</h3>
+              <p class="org">Electronic Engineering and Information Science, University of Science and Technology of China</p>
+              <p>Research on video generation and world models, carried out at Microsoft Research Asia.</p>
+            </div>
+          </div>
+          <div class="entry">
+            <div class="when">2022 — 2023</div>
+            <div>
+              <h3>Research Intern</h3>
+              <p class="org">Microsoft Research Asia</p>
+              <p>Controllable visual-text generation (GlyphControl) and diffusion-based training-data synthesis for handwritten character recognition.</p>
+            </div>
+          </div>
+          <div class="entry">
+            <div class="when">2019 — 2023</div>
+            <div>
+              <h3>B.Sc. in Data Science and Big Data Technology</h3>
+              <p class="org">School of Artificial Intelligence and Data Science, University of Science and Technology of China</p>
+              <p class="meta">GPA 3.9 / 4.3 · Rank 1 / 40 in the major</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- FOOTER -->
+      <footer id="contact">
+        <p class="sign reveal">To imagine a world is easy; to keep it the same world after you look away is the whole of the work.</p>
+        <div class="colophon reveal">
+          <span>© <span id="year">2026</span> Dongnan Gui</span>
+          <span>
+            <a href="mailto:dongnangui@mail.ustc.edu.cn">dongnangui@mail.ustc.edu.cn</a>
+            &nbsp;·&nbsp;
+            <a href="https://github.com/guidongnan" target="_blank" rel="noopener">github.com/guidongnan</a>
+          </span>
+        </div>
+      </footer>
+    </div>
+
+    <script>
+      document.getElementById("year").textContent = new Date().getFullYear();
+      const nav = document.getElementById("nav");
+      addEventListener("scroll", () => nav.classList.toggle("scrolled", scrollY > 8), { passive: true });
+      const io = new IntersectionObserver(
+        (es) => es.forEach((e) => { if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); } }),
+        { threshold: 0.1 }
+      );
+      document.querySelectorAll(".reveal").forEach((el) => io.observe(el));
+
+      // ambient cursor glow (Apple-ish, pointer devices only)
+      const orb = document.querySelector(".orb");
+      if (orb && matchMedia("(pointer:fine)").matches) {
+        let ox = innerWidth / 2, oy = innerHeight / 2, tx = ox, ty = oy;
+        addEventListener("pointermove", (e) => { tx = e.clientX; ty = e.clientY; }, { passive: true });
+        (function loop() { ox += (tx - ox) * 0.06; oy += (ty - oy) * 0.06; orb.style.transform = `translate(${ox}px, ${oy}px)`; requestAnimationFrame(loop); })();
+      }
+
+      // drifting multilingual quotes — vertical; hover to gloss, click to swap
+      const QUOTES = [
+        // Chinese (20)
+        { t: "一蓑烟雨任平生", c: "zh", g: "A straw cloak in the drizzle \u2014 I'll live out my whole life as I please. (Su Shi)" },
+        { t: "也无风雨也无晴", c: "zh", g: "Come storm or shine, it is all the same to me. (Su Shi)" },
+        { t: "菩提本无树，明镜亦非台", c: "zh", g: "Bodhi is no tree, the bright mirror no stand \u2014 from the first, not one thing. (Huineng)" },
+        { t: "采菊东篱下，悠然见南山", c: "zh", g: "Picking chrysanthemums by the eastern hedge, I catch sight of the far south mountain. (Tao Yuanming)" },
+        { t: "行到水穷处，坐看云起时", c: "zh", g: "I walk to where the water ends, then sit and watch the clouds arise. (Wang Wei)" },
+        { t: "空山不见人，但闻人语响", c: "zh", g: "Empty mountain, no one in sight \u2014 yet the sound of voices echoes. (Wang Wei)" },
+        { t: "明月松间照，清泉石上流", c: "zh", g: "Bright moon through the pines; clear spring over the stones. (Wang Wei)" },
+        { t: "宠辱不惊，看庭前花开花落", c: "zh", g: "Unmoved by favor or disgrace, I watch the courtyard flowers bloom and fall. (Caigentan)" },
+        { t: "天地与我并生，而万物与我为一", c: "zh", g: "Heaven and earth were born with me; the ten thousand things and I are one. (Zhuangzi)" },
+        { t: "相濡以沫，不如相忘于江湖", c: "zh", g: "Better than wetting each other with spit is to forget each other in the rivers and lakes. (Zhuangzi)" },
+        { t: "人生如逆旅，我亦是行人", c: "zh", g: "Life is an inn we pass through; I too am only a traveler. (Su Shi)" },
+        { t: "寄蜉蝣于天地，渺沧海之一粟", c: "zh", g: "A mayfly between heaven and earth, a single grain in the blue sea. (Su Shi)" },
+        { t: "会当凌绝顶，一览众山小", c: "zh", g: "One day atop the summit, I will see how small the other mountains are. (Du Fu)" },
+        { t: "落霞与孤鹜齐飞，秋水共长天一色", c: "zh", g: "A lone duck flies with the sunset glow; autumn waters merge with the endless sky. (Wang Bo)" },
+        { t: "结庐在人境，而无车马喧", c: "zh", g: "I built my hut among men, yet hear no clatter of horse and carriage. (Tao Yuanming)" },
+        { t: "若无闲事挂心头，便是人间好时节", c: "zh", g: "If no idle care hangs on the mind, every season is a good season. (Wumen)" },
+        { t: "应无所住而生其心", c: "zh", g: "Let the mind arise without resting on anything. (Diamond Sutra)" },
+        { t: "一切有为法，如梦幻泡影", c: "zh", g: "All conditioned things are a dream, an illusion, a bubble, a shadow. (Diamond Sutra)" },
+        { t: "小舟从此逝，江海寄余生", c: "zh", g: "Let the little boat drift off from here; I give my last years to the rivers and seas. (Su Shi)" },
+        { t: "宁静致远，淡泊明志", c: "zh", g: "Through stillness reach the distant; through simplicity clarify the will. (Zhuge Liang)" },
+        // English (20) — glossed in Chinese
+        { t: "What does not kill me<br>makes me stronger.", c: "en", g: "凡杀不死我的，使我更强大。——尼采《偶像的黄昏》" },
+        { t: "He who has a why to live<br>can bear almost any how.", c: "en", g: "人若有活下去的「为何」，就能忍受几乎任何「如何」。——尼采" },
+        { t: "Amor fati:<br>my formula for greatness.", c: "en", g: "热爱命运——这就是我对「伟大」的公式。——尼采《\u77A7，这个人》" },
+        { t: "One must still have chaos in oneself<br>to give birth to a dancing star.", c: "en", g: "人心中仍须有混沌，方能诞生一颗舞动的星。——尼采《查拉图斯特拉如是说》" },
+        { t: "When you gaze long into an abyss,<br>the abyss also gazes into you.", c: "en", g: "当你久久凝视深渊，深渊也在凝视你。——尼采《善恶的彼岸》" },
+        { t: "Become who you are.", c: "en", g: "成为你所是。——尼采（承自品达）" },
+        { t: "You have power over your mind \u2014<br>not outside events.", c: "en", g: "你能主宰的是自己的心，而非外境。——马可·\u5965勒留《沉思录》" },
+        { t: "The obstacle stands in the way,<br>and becomes the way.", c: "en", g: "挡路之物，反而成为道路。——化用马可·\u5965勒留《沉思录》" },
+        { t: "We suffer more often in imagination<br>than in reality.", c: "en", g: "我们在想象里受的苦，多过现实。——塞内卡《道德书简》" },
+        { t: "Man is disturbed not by things,<br>but by his opinions about them.", c: "en", g: "扰乱人的不是事物，而是人对事物的看法。——爱比克泰德《手册》" },
+        { t: "In the midst of winter, I found<br>there was in me an invincible summer.", c: "en", g: "在隆冬里，我终于发现，我心中有一个不可战胜的夏天。——加缪《重返蒂帕萨》" },
+        { t: "One must imagine<br>Sisyphus happy.", c: "en", g: "应当想象西西弗是幸福的。——加缪《西西弗神话》" },
+        { t: "Let everything happen to you:<br>beauty and terror. Just keep going.", c: "en", g: "让一切降临于你：美与惊惧。只管向前。——里尔克《时辰之书》" },
+        { t: "I am the master of my fate,<br>I am the captain of my soul.", c: "en", g: "我是命运的主人，我是灵魂的舵手。——亨利《不可征服》" },
+        { t: "Do not go gentle into that good night.<br>Rage against the dying of the light.", c: "en", g: "不要温顺地走进那良夜；怒斥，怒斥光的消逝。——狄兰·托马斯" },
+        { t: "To strive, to seek, to find,<br>and not to yield.", c: "en", g: "去奋斗，去求索，去发现，永不屈服。——丁尼生《尤利西斯》" },
+        { t: "Two roads diverged in a wood, and I \u2014<br>I took the one less traveled by.", c: "en", g: "林中两路分岔，而我——选了人迹更少的那条。——弗罗斯特《未选择的路》" },
+        { t: "Ever tried. Ever failed. No matter.<br>Try again. Fail again. Fail better.", c: "en", g: "试过，败过。无妨。再试，再败，败得更好。——贝克特《向着更糟去》" },
+        { t: "The wound is the place<br>where the Light enters you.", c: "en", g: "伤口，是光进入你的地方。——常题于鲁米（通行英译）" },
+        { t: "The world breaks everyone, and afterward<br>many are strong at the broken places.", c: "en", g: "世界击垮每个人，事后许多人在断裂处长得更强。——海明威《永别了，武器》" },
+        // Other languages (21) — glossed in both Chinese and English
+        { t: "Amor fati", c: "la", g: "拉丁语·热爱命运：接纳所发生的一切。", g2: "Latin \u2014 'love of fate'; embrace all that happens." },
+        { t: "Memento mori", c: "la", g: "拉丁语·勿忘你终有一死。", g2: "Latin \u2014 'remember that you must die'." },
+        { t: "Carpe diem", c: "la", g: "拉丁语（贺拉斯）·抓住当下。", g2: "Latin (Horace) \u2014 'seize the day'." },
+        { t: "Per aspera ad astra", c: "la", g: "拉丁语·历尽艰辛，直抵星辰。", g2: "Latin \u2014 'through hardship to the stars'." },
+        { t: "Sapere aude", c: "la", g: "拉丁语（贺拉斯／康德）·敢于运用你的理智。", g2: "Latin (Horace / Kant) \u2014 'dare to know'." },
+        { t: "Amor vincit omnia", c: "la", g: "拉丁语（维吉尔）·爱征服一切。", g2: "Latin (Virgil) \u2014 'love conquers all'." },
+        { t: "Vincit qui se vincit", c: "la", g: "拉丁语·战胜自己者，方为胜者。", g2: "Latin \u2014 'he conquers who conquers himself'." },
+        { t: "\u03B3\u03BD\u1FF6\u03B8\u03B9 \u03C3\u03B5\u03B1\u03C5\u03C4\u03CC\u03BD", c: "el", g: "希腊语（德尔斐神谕）·认识你自己。", g2: "Greek (Delphi) \u2014 'know thyself'." },
+        { t: "\u03C0\u03AC\u03BD\u03C4\u03B1 \u1FE5\u03B5\u1FD6", c: "el", g: "希腊语（赫拉克利特）·万物流变，无物常驻。", g2: "Greek (Heraclitus) \u2014 'everything flows'." },
+        { t: "\u03BC\u03B7\u03B4\u1F72\u03BD \u1F04\u03B3\u03B1\u03BD", c: "el", g: "希腊语（德尔斐神谕）·凡事勿过度。", g2: "Greek (Delphi) \u2014 'nothing in excess'." },
+        { t: "\u0938\u0924\u094D\u092F\u092E\u0947\u0935 \u091C\u092F\u0924\u0947", c: "sa", g: "梵语（《蒙达卡奥义书》）·唯真理得胜。", g2: "Sanskrit (Mundaka Upanishad) \u2014 'truth alone triumphs'." },
+        { t: "\u0924\u0924\u094D \u0924\u094D\u0935\u092E\u094D \u0905\u0938\u093F", c: "sa", g: "梵语（《歌者奥义书》）·你即那（梵我一如）。", g2: "Sanskrit (Chandogya Upanishad) \u2014 'thou art that'." },
+        { t: "\u0935\u0938\u0941\u0927\u0948\u0935 \u0915\u0941\u091F\u0941\u092E\u094D\u092C\u0915\u092E\u094D", c: "sa", g: "梵语·天下一家。", g2: "Sanskrit \u2014 'the world is one family'." },
+        { t: "\u0F68\u0F7C\u0F7E\u0F0B\u0F58\u0F0B\u0F4E\u0F72\u0F0B\u0F54\u0F51\u0FA8\u0F7A\u0F0B\u0F67\u0F71\u0F74\u0F83", c: "bo", g: "藏语·六字大明咒「唵嘛呢叭咪吽」。", g2: "Tibetan \u2014 the mantra 'Om Mani Padme Hum'." },
+        { t: "\u0627\u0637\u0644\u0628\u0648\u0627 \u0627\u0644\u0639\u0644\u0645 \u0648\u0644\u0648 \u0641\u064A \u0627\u0644\u0635\u064A\u0646", c: "ar", g: "阿拉伯语·求知去吧，哪怕远在中国。", g2: "Arabic \u2014 'seek knowledge, even unto China'." },
+        { t: "\u0625\u0646\u0645\u0627 \u0627\u0644\u0623\u0639\u0645\u0627\u0644 \u0628\u0627\u0644\u0646\u064A\u0627\u062A", c: "ar", g: "阿拉伯语（圣训）·一切行为，取决于其动机。", g2: "Arabic (hadith) \u2014 'deeds are but by intentions'." },
+        { t: "\u0628\u0646\u06CC\u200C\u0622\u062F\u0645 \u0627\u0639\u0636\u0627\u06CC \u06CC\u06A9\u062F\u06CC\u06AF\u0631\u0646\u062F", c: "fa", g: "\u6ce2\u65af\u8bed\uff08\u8428\u8fea\u300a\u8537\u8587\u56ed\u300b\uff09\u00b7\u4e9a\u5f53\u5b50\u5b59\u540c\u4e3a\u4e00\u4f53\u3002", g2: "Persian (Saadi) \u2014 'the sons of Adam are limbs of one body'." },
+        { t: "\u0627\u06CC\u0646 \u0646\u06CC\u0632 \u0628\u06AF\u0630\u0631\u062F", c: "fa", g: "波斯语·这也会过去。", g2: "Persian \u2014 'this too shall pass'." },
+        { t: "\u53E4\u6C60\u3084\u86D9\u98DB\u3073\u8FBC\u3080\u6C34\u306E\u97F3", c: "ja", g: "日语（松尾芭蕉）·古池塘，青蛙跃入，水之声。", g2: "Japanese (Basho) \u2014 'an old pond; a frog jumps in, the sound of water'." },
+        { t: "\u4E00\u671F\u4E00\u4F1A", c: "ja", g: "日语·一期一会：此会难再，珍重当下。", g2: "Japanese \u2014 'one time, one meeting'; treasure this encounter." },
+        { t: "Il faut imaginer Sisyphe heureux.", c: "fr", g: "法语（加缪）·应当想象西西弗是幸福的。", g2: "French (Camus) \u2014 'one must imagine Sisyphus happy'." },
+      ];
+      const qbox = document.querySelector(".quotes");
+      // two well-separated vertical bands per side, so each side can hold two quotes without crowding
+      const LANES = [[0.05, 0.26], [0.58, 0.79]];
+      const slots = { l: [null, null], r: [null, null] };
+      let lastSide = "r";
+      function liveQuotes() { return [...slots.l, ...slots.r].filter(Boolean); }
+      function releaseSlot(el) {
+        const lane = slots[el._side];
+        const k = lane.indexOf(el);
+        if (k >= 0) lane[k] = null;
+      }
+      function pickIdx(prev) {
+        const taken = new Set(liveQuotes().map((e) => e.dataset.qi));
+        if (prev >= 0) taken.add(String(prev));
+        let i = Math.floor(Math.random() * QUOTES.length);
+        for (let n = 0; n < 40 && taken.has(String(i)); n++) i = Math.floor(Math.random() * QUOTES.length);
+        return i;
+      }
+      function gutterFor(side) {
+        const r = document.querySelector(".wrap").getBoundingClientRect();
+        return side === "l" ? r.left : innerWidth - r.right;
+      }
+      function fillQuote(el, i) {
+        const q = QUOTES[i];
+        const side = el.classList.contains("qs-l") ? "qs-l" : "qs-r";
+        el.className = "q q-" + q.c + " " + side;
+        el.dataset.qi = i;
+        el.innerHTML = q.t + '<span class="q-tip"></span>';
+        const tip = el.lastChild;
+        const g1 = document.createElement("span");
+        g1.className = "q-g1";
+        g1.textContent = q.g;
+        tip.appendChild(g1);
+        if (q.g2) {
+          const g2 = document.createElement("span");
+          g2.className = "q-g2";
+          g2.textContent = q.g2;
+          tip.appendChild(g2);
+        }
+      }
+      // CJK sets vertically and sizes itself; horizontal scripts need a measured margin-note width
+      function sizeQuote(el, gutter) {
+        const vertical = el.classList.contains("q-zh") || el.classList.contains("q-ja");
+        el.style.width = vertical ? "" : Math.max(112, Math.min(220, gutter - 56)) + "px";
+        return vertical;
+      }
+      // one place-and-validate step, shared by spawn / click-swap / resize: a quote whose
+      // margin no longer fits it is dropped rather than left sitting on the text column
+      function placeQuote(el) {
+        const side = el._side;
+        const gutter = gutterFor(side);
+        if (gutter < 130) return false;
+        const vertical = sizeQuote(el, gutter);
+        if (!vertical && gutter < 156) return false; // a horizontal note needs a roomier margin than a CJK column
+        const edge = side === "l" ? "left" : "right";
+        el.style[edge] = "0px";
+        const w = el.getBoundingClientRect().width; // measure at the outer edge, then inset
+        if (w > gutter - 46) return false;
+        // bias toward the outer half of the margin, away from the text column
+        el.style[edge] = 12 + Math.random() * Math.max(0, (gutter - w - 44) * 0.5) + "px";
+        return true;
+      }
+      function attachQuote(el) {
+        el.addEventListener("animationend", () => { releaseSlot(el); el.remove(); });
+        el.addEventListener("click", () => {
+          fillQuote(el, pickIdx(+el.dataset.qi));
+          if (!placeQuote(el)) { releaseSlot(el); el.remove(); return; }
+          el.style.animation = "none";
+          void el.offsetWidth; // restart the slow fade so the new line arrives gently
+          el.style.animation = "";
+        });
+      }
+      // a quote that has scrolled out of view must free its slot, or nothing appears further down the page
+      function retireOffscreen() {
+        for (const s of ["l", "r"]) {
+          slots[s].forEach((el, k) => {
+            if (!el) return;
+            const r = el.getBoundingClientRect();
+            if (r.bottom < -140 || r.top > innerHeight + 140) { slots[s][k] = null; el.remove(); }
+          });
+        }
+      }
+      function spawnQuote() {
+        if (!qbox || document.hidden) return;
+        retireOffscreen();
+        // the layer must span the document, or vertical text has no inline space and force-wraps into columns
+        const docH = document.documentElement.scrollHeight;
+        qbox.style.height = docH + "px";
+        const side = (lastSide === "l" ? ["r", "l"] : ["l", "r"]).find((s) => slots[s].includes(null));
+        if (!side) return;
+        const lane = slots[side].indexOf(null);
+        const el = document.createElement("div");
+        el._side = side;
+        el.className = "q qs-" + side;
+        fillQuote(el, pickIdx(-1));
+        const vertical = el.classList.contains("q-zh") || el.classList.contains("q-ja");
+        // positioned in document space so quotes scroll away with the page instead of sticking to the viewport
+        const band = LANES[lane];
+        const top = scrollY + innerHeight * (band[0] + Math.random() * (band[1] - band[0]));
+        el.style.top = Math.min(top, docH - innerHeight * (vertical ? 0.72 : 0.3)) + "px";
+        el.style[side === "l" ? "left" : "right"] = "0px";
+        qbox.appendChild(el);
+        if (!placeQuote(el)) { el.remove(); return; }
+        // keep the two quotes sharing this side from crowding each other
+        const mine = el.getBoundingClientRect();
+        const neighbour = slots[side].find(Boolean);
+        if (neighbour) {
+          const n = neighbour.getBoundingClientRect();
+          if (mine.top < n.bottom + 110 && n.top < mine.bottom + 110) { el.remove(); return; }
+        }
+        lastSide = side;
+        slots[side][lane] = el;
+        attachQuote(el);
+      }
+      spawnQuote();
+      setInterval(spawnQuote, 6200);
+      // the margins move when the window does, and a quote already on the page keeps its old
+      // offset, so every live quote is re-validated after a resize or a late webfont swap
+      function reflowQuotes() {
+        if (!qbox) return;
+        qbox.style.height = document.documentElement.scrollHeight + "px";
+        for (const el of liveQuotes()) if (!placeQuote(el)) { releaseSlot(el); el.remove(); }
+        spawnQuote();
+      }
+      let qResizeAt;
+      addEventListener("resize", () => { clearTimeout(qResizeAt); qResizeAt = setTimeout(reflowQuotes, 140); });
+      if (document.fonts && document.fonts.ready) document.fonts.ready.then(reflowQuotes);
+      let qScrollAt = 0;
+      addEventListener("scroll", () => {
+        const now = Date.now();
+        if (now - qScrollAt < 650) return;
+        qScrollAt = now;
+        spawnQuote();
+      }, { passive: true });
+    </script>
+  </body>
+</html>

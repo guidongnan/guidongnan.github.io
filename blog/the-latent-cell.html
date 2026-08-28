@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <title>The latent cell · Dongnan Gui</title>
+    <meta name="description" content="A short field note on the one length scale that decides whether a simulated event survives into a generated video, why half my failures were this number being ignored, and what I think should be automated next." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;450;500;600&family=JetBrains+Mono:wght@400;500&family=Noto+Serif+SC:wght@500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="blog.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" />
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"
+      onload="renderMathInElement(document.body,{delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}],throwOnError:false})"></script>
+  </head>
+  <body>
+    <header class="topbar" id="topbar">
+      <a class="home" href="../index.html">Dongnan Gui</a>
+      <a href="../index.html#writing">← All writing</a>
+      <a href="the-latent-cell.zh.html">中文</a>
+    </header>
+
+    <nav class="toc" id="toc">
+      <div class="toc-h">Contents</div>
+      <a href="#unit">A unit of length</a>
+      <a href="#arith">The arithmetic</a>
+      <a href="#solver">The solver has its own scale</a>
+      <a href="#silhouette">Silhouette is the whole signal</a>
+      <a href="#optics">Two things that are not geometry</a>
+      <a href="#next">What should be automated</a>
+    </nav>
+
+    <article>
+      <div class="post-head">
+        <div class="kicker">Field note</div>
+        <h1>The latent cell</h1>
+        <div class="meta">
+          <span>August 2026</span><span class="dot"></span>
+          <span>~7 min</span><span class="dot"></span>
+          <span>simulation-conditioned video · scale</span>
+        </div>
+      </div>
+
+      <p class="lead">A small summary of a small corner: driving a video diffusion model with a physics simulation instead of a hand-animated keyframe. There is exactly one number in this pipeline that I underestimated, and roughly half of my documented failures come from ignoring it. It is a length, it is measured in millimetres, and it changes from shot to shot.</p>
+
+      <h2 id="unit">A unit of length</h2>
+
+      <p>The setup is straightforward. A program describes a rigid-body scene, a solver runs it, the render produces a depth pass, and the depth pass is the entire signal a frozen video model receives. Everything you see in the final clip that is not geometry or timing — material, colour, weather, light — is invented by the model from text.</p>
+
+      <p>The catch is that the model does not work in pixels. Its autoencoder downsamples spatially by a factor of eight, so the finest thing the conditioning signal can actually carry is one cell of that latent grid. Call it $c$. Then, empirically:</p>
+
+      <ul>
+        <li>a displacement smaller than about $1c$ is not renderable at all — it simply is not in the signal;</li>
+        <li>it does not read to a viewer as <em>movement</em> until roughly $2.7c$.</li>
+      </ul>
+
+      <p>What makes this bite is that $c$ is a length <em>in the world</em>, not in the image, so it is set by how much world the frame covers:</p>
+
+      $$ c \;=\; 8\cdot\frac{W_{\text{world}}}{W_{\text{px}}}. $$
+
+      <p>Across the scenes I built, $c$ ranged from about 6 mm on a tabletop shot to something like 120 mm in a wide outdoor one. So the minimum legible motion, $2.7c$, is around 16 mm on the desk and around 180 mm outdoors. That is a factor of twenty in what counts as "it moved", decided entirely by where I put the camera.</p>
+
+      <div class="callout"><b>Why this is worth writing down.</b> A physically correct simulation can be perfectly, invisibly correct. The solver is happy; the assertion passes; the video shows nothing. The failure has no symptom at the layer where you are looking for it, which is why I kept diagnosing it as something else.</div>
+
+      <h2 id="arith">The arithmetic, done in advance</h2>
+
+      <p>The concrete habit that came out of this: before baking anything, compute $c$ for the shot and check the intended displacement against $2.7c$. It turns "will this read?" from a matter of taste into one line of arithmetic.</p>
+
+      <p>The clearest case I hit was a shot where a hammer was supposed to shove a sliding gate out from under about 1.65 tonnes of rock. Measured travel: 2 mm, against a stroke of 1.2 m. Not merely invisible — three hundred times below the threshold. Solving the collision backwards for the stroke I actually needed asked for a hammer of about thirteen tonnes, which is a good sign the design is wrong rather than the parameters.</p>
+
+      <p>The fix was a change of mechanism, and it generalized into the rule I now start from: <b>a trigger should release energy, not supply it.</b> Taking the floor away instead of pushing the mass turned that same 1.65 tonnes from the thing resisting the shot into the thing driving it. Same scene, same masses, same camera; the difference between nothing visible and the whole event.</p>
+
+      <h2 id="solver">The solver has its own scale, and it disagrees</h2>
+
+      <p>The latent cell is the constraint coming from the decoder. There is a second one coming from the physics engine, and they are unrelated, which is how I got caught twice.</p>
+
+      <p>The engine keeps a small collision margin around bodies — 4 mm by default in the one I use — and it applies to <em>both</em> bodies, so 8 mm of clearance is the practical floor. On a two-metre crate that is invisible. On a 15 mm domino it is 27% of the object. Every intuition I had built outdoors was wrong by an order of magnitude the moment the scene moved onto a desk.</p>
+
+      <p>The other one is subtler and I like it more: a rolling sphere in this engine wanders about 58 mm sideways over 0.3 m of travel. Outdoors, noise. On the tabletop, that is how a ball missed a 40 mm target it was aimed straight at. The simulation was not wrong; the tolerance I was designing to did not exist.</p>
+
+      <p>So: <b>two length scales per shot</b>, one from the decoder and one from the solver, and a shot is only well-posed if the event is larger than both.</p>
+
+      <h2 id="silhouette">Under depth conditioning, silhouette is the whole signal</h2>
+
+      <p>This is the part I would tell anyone starting on this. If the only thing you hand the model is depth, then the outline of the object <em>is</em> the object. Text cannot add detail that the geometry does not have.</p>
+
+      <p>I learned it by writing a careful prompt about buckled door skins and shattered glass over a mesh that was, in fact, four cuboids. It rendered a stack of plain crates, exactly as it should have. The words describing damage had nothing in the signal to attach to.</p>
+
+      <p>Which means identifying detail has to be modelled — and, closing the loop, it has to be sized against the latent cell rather than against reality. A handrail on a gangway is a real object of real dimensions, but the question that decides whether it survives is whether its posts clear $c$ in the frame you actually shot.</p>
+
+      <p>I did check this rather than assume it: matched pairs, identical prompt and seed, geometry differing only by a welded-on feature. The renders move measurably toward captions that name the feature. They also, on the first pass, appeared not to — which turned out to be a measurement problem and is <a href="metrics-that-lie.html#four">its own story</a>.</p>
+
+      <h2 id="optics">Two things that are not geometry</h2>
+
+      <p>Two failures did not fit the length-scale story at all, and both are optical.</p>
+
+      <p><b>Thrown dust is not there unless it is backlit.</b> Two cuts sharing a depth condition, both prompts asking for dust: in the daylight cut it is invisible, in the cut shot into an open shed door it carries the entire collapse. Airborne particulate is optically thin. Lit from the front it adds almost nothing; lit from behind it forward-scatters and becomes the subject. This is a prompt-side and camera-side decision that no amount of geometry fixes.</p>
+
+      <p><b>A defect outside the frustum is not a defect.</b> One domino at the end of a run toppled on its own around frame 2, and I spent real time on seat heights and friction before checking where it was. It sat at $x=-0.635$ while the lens was at $x=0.24$ with a field of 0.72 m. It was never in shot. Check the frame before paying for the fix.</p>
+
+      <h2 id="next">What I think should be automated next</h2>
+
+      <p>Everything above is currently a human noticing a number. That is the wrong place for it, because all of it is derivable: the camera and the resolution give you $c$, the engine's configuration gives you the margin, and the program already declares which bodies are supposed to move and in what order. Nothing here needs taste.</p>
+
+      <p>So the direction I find interesting is a <b>decoder-aware planner</b> — one that takes the intended event and derives the geometry scale from the constraints of the thing that will eventually render it, instead of producing a physically plausible scene and discovering afterwards that it is sub-threshold. Concretely, a harness that measures the conditioning signal a program produced against constraints computed from the decoder, and hands failures back with the offending body and the number attached, so the next draft is a repair rather than a resample.</p>
+
+      <p>My reason for thinking repair beats resampling is narrow but I believe it: sampling several blind drafts and picking the best one cannot fix a causal inversion, because none of the drafts contains the fix. You can spend several times the compute on more samples and still lose to one draft plus a measurement, provided the measurement is specific enough to point at what to change.</p>
+
+      <p>The broader version of the same thought, and the reason I keep working in this corner: a video model has no persistent identity for anything in it, so it cannot be edited — ask for a heavier crate and your only move is a new seed. A program can be edited, because the crate has a name. That seems to me like the more useful thing to be holding.</p>
+
+      <div class="post-foot">
+        <a href="metrics-that-lie.html">← Previously: Four times my metric lied to me</a>
+        <a href="../index.html#writing">All writing →</a>
+      </div>
+    </article>
+
+    <script>
+      const tb = document.getElementById("topbar");
+      addEventListener("scroll", () => tb.classList.toggle("scrolled", scrollY > 8), { passive: true });
+      const links = [...document.querySelectorAll(".toc a")];
+      const ids = links.map((a) => a.getAttribute("href").slice(1));
+      const spy = new IntersectionObserver((es) => {
+        es.forEach((e) => { if (e.isIntersecting) {
+          links.forEach((l) => l.classList.remove("active"));
+          const a = links.find((l) => l.getAttribute("href") === "#" + e.target.id);
+          if (a) a.classList.add("active");
+        }});
+      }, { rootMargin: "-70px 0px -70% 0px" });
+      ids.forEach((id) => { const el = document.getElementById(id); if (el) spy.observe(el); });
+    </script>
+  </body>
+</html>

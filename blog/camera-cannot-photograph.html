@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <title>Things a camera cannot photograph · Dongnan Gui</title>
+    <meta name="description" content="Once the bodies in a scene have names and trajectories, you can draw conditioning signals that no render pass produces — where a body has been, which silhouette is in front, where things touch. Notes on a family of priors, and on what I have not proved yet." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;450;500;600&family=JetBrains+Mono:wght@400;500&family=Noto+Serif+SC:wght@500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="blog.css" />
+  </head>
+  <body>
+    <header class="topbar" id="topbar">
+      <a class="home" href="../index.html">Dongnan Gui</a>
+      <a href="../index.html#writing">← All writing</a>
+      <a href="camera-cannot-photograph.zh.html">中文</a>
+    </header>
+
+    <nav class="toc" id="toc">
+      <div class="toc-h">Contents</div>
+      <a href="#free">The form is a free variable</a>
+      <a href="#spectrum">A spectrum, not a list</a>
+      <a href="#draw">Four things a camera cannot see</a>
+      <a href="#metric">A prior you cannot hand over is a metric</a>
+      <a href="#next">What I would try next</a>
+    </nav>
+
+    <article>
+      <div class="post-head">
+        <div class="kicker">Field note</div>
+        <h1>Things a camera cannot photograph</h1>
+        <div class="meta">
+          <span>August 2026</span><span class="dot"></span>
+          <span>~6 min</span><span class="dot"></span>
+          <span>conditioning · control · simulation</span>
+        </div>
+      </div>
+
+      <p class="lead">Controllable video generation has settled on a short list of conditioning signals: depth, edges, pose, segmentation, optical flow. There is a reason the list is short, and it is not that these are the best ways to describe an event. It is that these are the things you can extract from footage you already have. If your scene comes from a simulator instead, that constraint disappears, and it turns out there are useful representations nobody uses because no camera can produce them.</p>
+
+      <h2 id="free">The form is a free variable</h2>
+
+      <p>The setup: a program describes a physical scene, a solver runs it, and the result is handed to a frozen video model as a conditioning signal. Depth was the first form I used, and for a while I assumed it was <em>the</em> form — the pipeline was "a depth pipeline".</p>
+
+      <p>The probe that changed my mind is embarrassingly simple. Take one baked scene. Hold the prompt file byte for byte identical, the seed identical, the step count identical, the canvas identical. Change only which representation goes to the model. Depth, then surface normals, then flat per-object segmentation colours.</p>
+
+      <p>The model follows all three. Not equally well in every respect, but it tracks the same event through each. Which means the conditioning form is not a property of the pipeline; it is a variable I get to choose per shot, and choosing it well is a design question I had not realised I was allowed to ask.</p>
+
+      <h2 id="spectrum">A spectrum, not a list</h2>
+
+      <p>Having decided the form is free, the next question is what the axis actually is. The one I find useful is <b>how much appearance the signal leaks</b>.</p>
+
+      <p>At one end sits depth: it carries geometry and nothing else, so the model must invent every surface, every material, every light. At the other end, hypothetically, is finished footage — where nothing is left to invent and the "generation" is a copy. Everything real lives in between, and where a form sits determines what you are actually asking the model to do.</p>
+
+      <figure class="plain">
+        <svg viewBox="0 0 820 200" role="img" aria-label="A spectrum from pure structure to appearance. Depth, contact graph, camera and event forms leak no appearance; trail and trajectory slightly more; contact map, occlusion order, flow and bounding boxes a little more; pose, segmentation and slope maps more; surface normals more still; diagram furthest along. Finished footage would be the far end.">
+          <line x1="20" y1="112" x2="800" y2="112" stroke="#e2e2e7" stroke-width="2"/>
+          <text x="20" y="34" font-family="Inter, system-ui, sans-serif" font-size="12.5" font-weight="600" fill="#16161a">pure structure</text>
+          <text x="20" y="52" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#8b8b95">the model rebuilds every pixel</text>
+          <text x="800" y="34" text-anchor="end" font-family="Inter, system-ui, sans-serif" font-size="12.5" font-weight="600" fill="#8b8b95">appearance</text>
+          <text x="800" y="52" text-anchor="end" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#8b8b95">nothing left to invent</text>
+
+          <g font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#33333b">
+            <circle cx="20" cy="112" r="6" fill="#4b41d8"/>
+            <text x="20" y="140" text-anchor="middle" fill="#4b41d8" font-weight="600">depth</text>
+            <text x="20" y="156" text-anchor="middle" fill="#8b8b95">contact graph</text>
+            <text x="20" y="170" text-anchor="middle" fill="#8b8b95">camera · events</text>
+
+            <circle cx="120" cy="112" r="5" fill="#7a72e2"/>
+            <text x="120" y="92" text-anchor="middle">trail</text>
+            <text x="120" y="78" text-anchor="middle" fill="#8b8b95">trajectory</text>
+
+            <circle cx="220" cy="112" r="5" fill="#7a72e2"/>
+            <text x="220" y="140" text-anchor="middle">contact map</text>
+            <text x="220" y="156" text-anchor="middle">occlusion order</text>
+            <text x="220" y="170" text-anchor="middle" fill="#8b8b95">flow · bbox</text>
+
+            <circle cx="330" cy="112" r="5" fill="#9a94ea"/>
+            <text x="330" y="92" text-anchor="middle">pose</text>
+
+            <circle cx="420" cy="112" r="5" fill="#9a94ea"/>
+            <text x="420" y="140" text-anchor="middle">segmentation</text>
+            <text x="420" y="156" text-anchor="middle" fill="#8b8b95">slope map</text>
+
+            <circle cx="560" cy="112" r="5" fill="#bcb7f0"/>
+            <text x="560" y="92" text-anchor="middle">surface normal</text>
+
+            <circle cx="660" cy="112" r="5" fill="#d5d2f6"/>
+            <text x="660" y="140" text-anchor="middle">diagram</text>
+          </g>
+          <text x="20" y="192" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#8b8b95">Two dozen forms behind one interface. Position on this axis is reported, not enforced — it tells you how much of the picture you are still asking for.</text>
+        </svg>
+        <figcaption>Choosing a conditioning form is choosing how much of the image the model is responsible for.</figcaption>
+      </figure>
+
+      <p>This turned out to be the more useful way to think about control than "which ControlNet do I load". A shot where the material is the point wants a signal near the structure end, so the model has room. A shot where the geometry is subtle and the material is boring wants something further along.</p>
+
+      <h2 id="draw">Four things a camera cannot see</h2>
+
+      <p>Here is the part that only exists because the scene came from a program. About nine of my two dozen forms have no counterpart in the published control literature, and the reason is simple: <b>they are not render passes.</b> There is no engine setting for "where has this body been". You cannot photograph it. But if you have every body's world position at every frame, and the camera that saw them, you can just draw it.</p>
+
+      <figure class="plain">
+        <svg viewBox="0 0 820 260" role="img" aria-label="Four invented conditioning representations: a trail showing where each body has been, occlusion order showing which silhouette is in front with metric distance discarded, a contact map showing only where bodies touch, and an event raster with one row per body and one column per frame.">
+          <g>
+            <rect x="0" y="26" width="190" height="112" rx="10" fill="#fafafc" stroke="#e2e2e7"/>
+            <text x="12" y="18" font-family="Inter, system-ui, sans-serif" font-size="12.5" font-weight="600" fill="#4b41d8">trail</text>
+            <path d="M22 118 C 60 108, 96 84, 150 54" fill="none" stroke="#4b41d8" stroke-width="7" opacity="0.15"/>
+            <path d="M60 108 C 92 96, 118 76, 150 54" fill="none" stroke="#4b41d8" stroke-width="7" opacity="0.32"/>
+            <path d="M110 82 C 128 72, 138 64, 150 54" fill="none" stroke="#4b41d8" stroke-width="7" opacity="0.6"/>
+            <circle cx="150" cy="54" r="8" fill="#4b41d8"/>
+            <text x="12" y="132" font-family="Inter, system-ui, sans-serif" font-size="11" fill="#8b8b95">one frame carries its own history</text>
+          </g>
+          <g transform="translate(210,0)">
+            <rect x="0" y="26" width="190" height="112" rx="10" fill="#fafafc" stroke="#e2e2e7"/>
+            <text x="12" y="18" font-family="Inter, system-ui, sans-serif" font-size="12.5" font-weight="600" fill="#4b41d8">occlusion order</text>
+            <rect x="24" y="52" width="76" height="66" rx="6" fill="#d5d2f6"/>
+            <rect x="58" y="66" width="76" height="60" rx="6" fill="#9a94ea"/>
+            <rect x="96" y="80" width="72" height="46" rx="6" fill="#4b41d8"/>
+            <text x="12" y="132" font-family="Inter, system-ui, sans-serif" font-size="11" fill="#8b8b95">rank only — metric distance discarded</text>
+          </g>
+          <g transform="translate(420,0)">
+            <rect x="0" y="26" width="190" height="112" rx="10" fill="#fafafc" stroke="#e2e2e7"/>
+            <text x="12" y="18" font-family="Inter, system-ui, sans-serif" font-size="12.5" font-weight="600" fill="#4b41d8">contact map</text>
+            <circle cx="60" cy="72" r="24" fill="none" stroke="#d8d8de"/>
+            <circle cx="104" cy="86" r="28" fill="none" stroke="#d8d8de"/>
+            <circle cx="82" cy="112" r="22" fill="none" stroke="#d8d8de"/>
+            <ellipse cx="83" cy="78" rx="7" ry="4" fill="#4b41d8"/>
+            <ellipse cx="70" cy="96" rx="6" ry="4" fill="#4b41d8" opacity="0.7"/>
+            <ellipse cx="97" cy="106" rx="8" ry="4" fill="#4b41d8"/>
+            <text x="12" y="132" font-family="Inter, system-ui, sans-serif" font-size="11" fill="#8b8b95">only where, and how hard, things touch</text>
+          </g>
+          <g transform="translate(630,0)">
+            <rect x="0" y="26" width="190" height="112" rx="10" fill="#fafafc" stroke="#e2e2e7"/>
+            <text x="12" y="18" font-family="Inter, system-ui, sans-serif" font-size="12.5" font-weight="600" fill="#4b41d8">event raster</text>
+            <g fill="#4b41d8">
+              <rect x="20" y="48" width="8" height="8" rx="2" opacity="0.85"/>
+              <rect x="52" y="48" width="8" height="8" rx="2" opacity="0.5"/>
+              <rect x="88" y="66" width="8" height="8" rx="2" opacity="0.9"/>
+              <rect x="120" y="66" width="8" height="8" rx="2" opacity="0.4"/>
+              <rect x="60" y="84" width="8" height="8" rx="2" opacity="0.75"/>
+              <rect x="140" y="84" width="8" height="8" rx="2" opacity="0.9"/>
+              <rect x="104" y="102" width="8" height="8" rx="2" opacity="0.6"/>
+              <rect x="156" y="102" width="8" height="8" rx="2" opacity="0.85"/>
+            </g>
+            <line x1="16" y1="120" x2="176" y2="120" stroke="#e2e2e7"/>
+            <text x="12" y="132" font-family="Inter, system-ui, sans-serif" font-size="11" fill="#8b8b95">one row per body, one column per frame</text>
+          </g>
+          <line x1="0" y1="170" x2="820" y2="170" stroke="#ececef"/>
+          <text x="0" y="194" font-family="Inter, system-ui, sans-serif" font-size="12" fill="#33333b">None of these is a render pass. They are drawn by projecting the baked bodies back through the baked camera,</text>
+          <text x="0" y="214" font-family="Inter, system-ui, sans-serif" font-size="12" fill="#33333b">so every pixel that lights up is traceable to a specific body at a specific frame.</text>
+          <text x="0" y="242" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#8b8b95">The event raster is the one I find strangest: it makes time a spatial axis, so a single image contains the schedule of the whole shot.</text>
+        </svg>
+        <figcaption>Four representations that exist only because the scene was a program before it was an image.</figcaption>
+      </figure>
+
+      <p>The trail is the one I would reach for first. Video models are bad at maintaining a coherent path over a long shot, and a trail hands the whole path over in a single frame instead of asking the model to integrate it. The occlusion-order form is the one I would reach for when depth is fighting me: sometimes you want the model to know that the crate is in front of the drum without committing it to a specific distance, and throwing the metric away is the whole point rather than a loss.</p>
+
+      <h2 id="metric">A prior you cannot hand over is a metric</h2>
+
+      <p>Now the honest part, which is also the part I would want a reviewer to hold me to.</p>
+
+      <p>Inventing a representation is cheap. Verifying that it faithfully describes the scene is only slightly harder — and I do verify all of them, against constraints derived from the scene itself. But <b>verifying a representation is not the same as conditioning on it.</b> A signal I can measure but cannot feed to the model is a diagnostic, not a control channel.</p>
+
+      <p>Of the nine invented forms, four are rasterised into actual conditioning videos. Zero have been through the video model. So the claim I can currently defend is "the conditioning form is a free variable, demonstrated across three forms". The claim I would <em>like</em> to defend — that it is free across two dozen — is a design with evidence pending, and I would rather say that plainly than let a large number do rhetorical work it has not earned.</p>
+
+      <p>There is a related trap worth naming, because I nearly fell into it. It is very easy to build a beautiful representation, verify it, put it in a gallery, and never notice that the model has not seen it. The gallery looks like a result. It is a to-do list.</p>
+
+      <h2 id="next">What I would try next</h2>
+
+      <p>Two experiments, in the order I would run them.</p>
+
+      <p><b>Push the four rasterised forms through the model.</b> Same bake, same prompt, same seed — the identical protocol as the depth/normal/segmentation probe. The interesting outcome is not "it works". It is whether the trail helps most on exactly the shots where the path is long and the model usually loses it, which is a specific, falsifiable prediction rather than a general hope.</p>
+
+      <p><b>Mix forms within a shot.</b> Nothing about the interface requires one channel. A contact map carries almost no appearance and says precisely where the interesting moment is; depth carries the layout. Handing over both is closer to how I would brief a human, and I have no idea whether current models can use two structural signals at once. That ignorance is the reason to run it.</p>
+
+      <p>The broader thought, which is the reason I keep pulling on this: everyone conditions on depth because depth is what you can extract from a video you already have. That is a fact about datasets, not about what video models can use. Once the scene is a program, the question stops being "what can I extract" and becomes "what would I <em>tell</em> it, if I could say anything" — and I do not think the field has spent much time on the second question.</p>
+
+      <div class="post-foot">
+        <a href="hold-the-model-fixed.html">← Related: Hold the model fixed</a>
+        <a href="the-latent-cell.html">Next: The latent cell →</a>
+      </div>
+    </article>
+
+    <script>
+      const tb = document.getElementById("topbar");
+      addEventListener("scroll", () => tb.classList.toggle("scrolled", scrollY > 8), { passive: true });
+      const links = [...document.querySelectorAll(".toc a")];
+      const ids = links.map((a) => a.getAttribute("href").slice(1));
+      const spy = new IntersectionObserver((es) => {
+        es.forEach((e) => { if (e.isIntersecting) {
+          links.forEach((l) => l.classList.remove("active"));
+          const a = links.find((l) => l.getAttribute("href") === "#" + e.target.id);
+          if (a) a.classList.add("active");
+        }});
+      }, { rootMargin: "-70px 0px -70% 0px" });
+      ids.forEach((id) => { const el = document.getElementById(id); if (el) spy.observe(el); });
+    </script>
+  </body>
+</html>

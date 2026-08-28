@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <title>A single image is already a world · Dongnan Gui</title>
+    <meta name="description" content="Why consistency, not fidelity, is the real target for single-image world generation — and what it asks of a model." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;450;500;600&family=JetBrains+Mono:wght@400;500&family=Noto+Serif+SC:wght@500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="blog.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" />
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"
+      onload="renderMathInElement(document.body,{delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}],throwOnError:false})"></script>
+  </head>
+  <body>
+    <header class="topbar" id="topbar">
+      <a class="home" href="../index.html">Dongnan Gui</a>
+      <a href="../index.html#writing">← All writing</a>
+      <a href="single-image-world.zh.html">中文</a>
+    </header>
+
+    <nav class="toc" id="toc">
+      <div class="toc-h">Contents</div>
+      <a href="#guess">The guess behind the camera</a>
+      <a href="#fidelity">Fidelity is the easy axis</a>
+      <a href="#consistency">What consistency demands</a>
+      <a href="#measure">How to measure it</a>
+      <a href="#mech">Where consistency comes from</a>
+      <a href="#prior">Why one image is enough</a>
+    </nav>
+
+    <article>
+      <div class="post-head">
+        <div class="kicker">Notes on video generation</div>
+        <h1>A single image is already a world</h1>
+        <div class="meta">
+          <span>August 2026</span><span class="dot"></span>
+          <span>~8 min</span><span class="dot"></span>
+          <span>world models · image-to-video · consistency</span>
+        </div>
+      </div>
+
+      <p class="lead">Hand someone one photo of a street and ask what is behind the camera. They will make something up, and it will not be arbitrary — it obeys the same city, the same weather, the same hour of the day. That small act of guessing is world-building, and it is the capability I care about most.</p>
+
+      <h2 id="guess">The guess behind the camera</h2>
+      <p>An image looks like a flat array of pixels, but nobody perceives it that way. You read a photograph as a slice of a three-dimensional, temporally extended world, complete with an implied off-screen: the rest of the room, the street continuing past the frame, what things would look like if you took two steps left. A single-image world model is a bet that a network can make that same inference — that from one view it can produce a whole navigable scene you can turn around in, walk through, come back to.</p>
+      <p>The cleanest way I have found to state the goal: don't generate a video, generate a <em>world</em>, and let video be one way of reading it out. Formally, imagine an (implicit) world state $W$ and a renderer that turns a camera pose $c$ into an image:</p>
+      $$ \hat{x}_c = R(W, c). $$
+      <p>Generating a panorama or a fly-through is then a sequence of reads $R(W, c_1), R(W, c_2), \dots$ from the <em>same</em> $W$. The moment you write it this way, the interesting requirement falls out on its own.</p>
+
+      <h2 id="fidelity">Fidelity is the easy axis</h2>
+      <p>Most image-to-video work is judged on fidelity: sharp frames, plausible motion, no flicker. That axis matters, and it is also the one a strong decoder can quietly carry. Diffusion models are extremely good at making any individual frame look real. Give the model a good per-frame prior and you get pretty output almost for free.</p>
+      <p>The trouble is that "each frame looks real" says nothing about whether the frames describe the <em>same</em> place. You can have a sequence where every image is crisp and every pair of adjacent images is smooth, and yet the world underneath is quietly different in each — a door that was on the left is on the right when you pan back, a painting that changes subject when you look away and return.</p>
+
+      <h2 id="consistency">What consistency demands</h2>
+      <p>So the target I actually care about is <b>consistency</b>: reads from $W$ at different poses have to agree wherever they overlap. Turn ninety degrees and back, and the world should be the world you left. In the renderer notation, whenever two poses see the same surface, their outputs must match there —</p>
+      $$ R(W, c_i) \;\approx\; R(W, c_j) \quad\text{on their shared content.} $$
+      <p>This is a strong constraint, and it is strong in a useful way: you cannot satisfy it with a better decoder. It forces the model to <em>commit</em> to a latent scene and then stay committed as the camera moves. Fidelity is a property of frames; consistency is a property of the world behind them, and only the second one requires the model to have decided what the world is.</p>
+      <blockquote><p>You can fake fidelity with a good decoder. You cannot fake consistency — it is the model refusing to change its story.</p></blockquote>
+      <p>The failure mode when consistency is missing is oddly specific, and I have come to recognize it on sight: the model does not blur, it <em>redecorates</em>. Rooms rearrange when you are not looking at them, the way places do in dreams. That tell is the whole problem in miniature — a system generating locally plausible frames with no globally committed state.</p>
+
+      <h2 id="measure">How to measure it</h2>
+      <p>Since consistency is the goal, it has to be the thing you measure, and per-frame quality scores will not do it. A few probes I trust more than an FID number:</p>
+      <ul>
+        <li><b>Loop closure.</b> Generate a full turn and come back to the starting pose. Compare the returned view to the original. Any world model worth the name should nearly reproduce it; drift here is the cleanest signal that there is no stable $W$.</li>
+        <li><b>Cross-view agreement.</b> Where two generated views overlap, warp one into the other's frame using the geometry and measure the mismatch. This scores the world, not the prettiness.</li>
+        <li><b>Re-visitation over time.</b> The same test as loop closure but stretched — leave a region, wander, return much later. This is where memory (the subject of the <a href="long-video-memory.html">previous note</a>) and world consistency turn out to be the same problem seen from two sides.</li>
+      </ul>
+
+      <h2 id="mech">Where consistency has to come from</h2>
+      <p>Consistency will not appear by accident from a per-frame loss; something in the architecture has to enforce it. Three ingredients do most of the work, and they lean on each other.</p>
+      <ul>
+        <li><b>A persistent representation.</b> The generation has to route through a state shared across viewpoints — a panorama, a latent grid, an implicit scene — rather than being redrawn independently per frame. If every view is sampled fresh, there is nothing for it to be consistent <em>with</em>.</li>
+        <li><b>Reprojection as a loss, not just a metric.</b> The geometry that lets you <em>measure</em> cross-view agreement can also <em>supervise</em> it. Warp a generated view into a neighbor's frame and penalize the disagreement where they overlap; the model learns that turning the camera transforms one world rather than prompting a new one.</li>
+        <li><b>Autoregressive extension with feedback.</b> To go past a single panorama you continue the world: generate, commit, condition the next step on what you just committed. That is exactly the long-horizon memory problem from the <a href="long-video-memory.html">previous note</a> — which is why I think consistency-in-space and consistency-in-time are one requirement wearing two outfits.</li>
+      </ul>
+      <p>The objective reads the same way: a generation term plus a reprojection term over overlapping views,</p>
+      $$ \mathcal{L} = \mathcal{L}_{\text{gen}} + \lambda \sum_{i,j} \big\lVert \Pi_{i\to j}\,R(W,c_i) - R(W,c_j) \big\rVert_{\Omega_{ij}}, $$
+      <p>where $\Pi_{i\to j}$ warps view $i$ into view $j$ and $\Omega_{ij}$ is their shared region. That second term is zero exactly when the model has committed to a single world; every nonzero value is the model caught contradicting itself.</p>
+
+      <h2 id="prior">Why one image is enough</h2>
+      <p>It sounds like too little information — one view, and you want a whole world. But the model is not reconstructing the scene, it is <em>plausibly completing</em> it, and a good generative prior over natural scenes carries an enormous amount of the answer. Streets have far sides; rooms have fourth walls; light comes from somewhere consistent. The single image pins down the particular world; the prior supplies everything the image does not show, the same way you effortlessly guessed what was behind the camera.</p>
+      <p>That is the part I find genuinely exciting. When a single-image world holds together as you move through it, it is not a rendering trick and it is not memorization. Something inside has looked at one frame and decided what the world is — and is willing to be held to it.</p>
+
+      <hr />
+      <div class="refs">
+        <h3>References</h3>
+        <ol>
+          <li id="r1">Ha, D., &amp; Schmidhuber, J. (2018). <a href="https://scholar.google.com/scholar?q=Recurrent+World+Models+Facilitate+Policy+Evolution" target="_blank" rel="noopener">World Models</a>. NeurIPS.</li>
+          <li id="r2">Bruce, J., et al. (2024). <a href="https://scholar.google.com/scholar?q=Genie+Generative+Interactive+Environments" target="_blank" rel="noopener">Genie: Generative Interactive Environments</a>. ICML.</li>
+          <li id="r3">Gui, D., Guo, X., Zhou, W., &amp; Lu, Y. (2025). <a href="https://openreview.net/forum?id=PA47sKU8CU" target="_blank" rel="noopener">Image as a World: Generating Interactive World from Single Image via Panoramic Video Generation</a>. NeurIPS.</li>
+        </ol>
+      </div>
+
+      <div class="post-foot">
+        <a href="long-video-memory.html">← Memory, not context</a>
+        <a href="i2v-consent.html">Next: We taught photos to move →</a>
+      </div>
+    </article>
+
+    <script>
+      const tb = document.getElementById("topbar");
+      addEventListener("scroll", () => tb.classList.toggle("scrolled", scrollY > 8), { passive: true });
+      const links = [...document.querySelectorAll(".toc a")];
+      const spy = new IntersectionObserver((es) => {
+        es.forEach((e) => { if (e.isIntersecting) {
+          links.forEach((l) => l.classList.remove("active"));
+          const a = links.find((l) => l.getAttribute("href") === "#" + e.target.id);
+          if (a) a.classList.add("active");
+        }});
+      }, { rootMargin: "-70px 0px -70% 0px" });
+      links.map((a) => a.getAttribute("href").slice(1)).forEach((id) => { const el = document.getElementById(id); if (el) spy.observe(el); });
+    </script>
+  </body>
+</html>

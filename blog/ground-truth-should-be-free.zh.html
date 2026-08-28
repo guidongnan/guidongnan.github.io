@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <title>真值应当是免费的 · Dongnan Gui</title>
+    <meta name="description" content="如果状态由模拟器持有，每一个标注都是精确的，而且不花一分钱——这也是关于一段十分钟录制的深层推理问题之所以可被回答、而不是只能靠猜的唯一原因。" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;450;500;600&family=JetBrains+Mono:wght@400;500&family=Noto+Serif+SC:wght@500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="blog.css" />
+  </head>
+  <body>
+    <header class="topbar" id="topbar">
+      <a class="home" href="../index.zh.html">Dongnan Gui</a>
+      <a href="../index.zh.html#writing">← 全部文章</a>
+      <a href="ground-truth-should-be-free.html">English</a>
+    </header>
+
+    <nav class="toc" id="toc">
+      <div class="toc-h">目录</div>
+      <a href="#annotate">标注买不到什么</a>
+      <a href="#own">让模拟器持有状态</a>
+      <a href="#construct">由构造决定的难度</a>
+      <a href="#unbroken">为什么「不间断」重要</a>
+      <a href="#limits">显而易见的反对意见</a>
+    </nav>
+
+    <article>
+      <div class="post-head">
+        <div class="kicker">实践笔记</div>
+        <h1>真值应当是免费的</h1>
+        <div class="meta">
+          <span>2026 年 8 月</span><span class="dot"></span>
+          <span>约 6 分钟</span><span class="dot"></span>
+          <span>评测 · 数据 · 长时程</span>
+        </div>
+      </div>
+
+      <p class="lead">我需要评测这样一件事：模型能不能跟住十分钟连续不断的操作，并回答那些必须记得八分钟前发生了什么才答得出的问题。通常的做法是录下真实的操作过程，再花钱请人来标注。我认为这条路不只是贵——它在结构上就产不出我想问的那类问题。</p>
+
+      <h2 id="annotate">标注买不到什么</h2>
+
+      <p>假设你手上有一段十分钟的屏幕录制，画面里有人在逐条处理一列待办记录。关于它有两个问题：</p>
+
+      <ul>
+        <li>「05:09 的时候，哪个标签页是激活的？」</li>
+        <li>「这个队列一开始有 57 条记录。根据这段录制里完成的工作，有多少条从未被处理过？」</li>
+      </ul>
+
+      <p>第一个是感知问题，标注员看一帧就能回答。第二个则要求知道每一条被打开的记录、每一次给出的判定、每一次保存，并对整段过程做算术。标注员<em>也能</em>回答它——在这个意义上：一个非常有耐心的人，拖着进度条，二十分钟能把它还原出来，而且大概每五次会错一次。</p>
+
+      <p>于是是经济账决定了基准（benchmark）长什么样。当标注成本以人的分钟计，你得到的语料就会被那些几秒钟就能标完的问题占满，而深层问题只以一条手工做出来的小尾巴出现——这跟你真正想测的东西恰好反了过来。你的基准的难度分布，最后画出来的是你的标注预算，而不是能力。</p>
+
+      <h2 id="own">让模拟器持有状态</h2>
+
+      <p>该走的一步是：不再录制现实，改为生成现实，同时有一条硬性要求——<b>整段会话由同一个程序驱动同一份持久的应用状态。</b>不是拼接起来的片段，也不是照脚本演的碎块，而是一次不间断的运行，其中这个应用对自身有一个真实的模型。</p>
+
+      <p>这样做，标注就白白掉出来了。每一个光标目标都是已知的，因为是程序把它瞄过去的；每一次字段编辑都是已知的，因为是程序改的；每一条记录最终落进哪个分组也是已知的，因为是状态机把它放进去的。这里根本没有标注这一步，只有序列化这一步。</p>
+
+      <figure class="plain">
+        <svg viewBox="0 0 820 250" role="img" aria-label="上半部分：录下现实，再花钱请人标注，得到的是昂贵、含噪且浅层的标注。下半部分：由一个程序驱动一份持久的应用状态，于是日志本身就是真值，深层问题可以直接推导出来。">
+          <defs>
+            <marker id="c1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#8b8b95"/></marker>
+          </defs>
+          <text x="0" y="14" font-family="Inter, system-ui, sans-serif" font-size="12" font-weight="600" fill="#8b8b95" letter-spacing="1.2">先录制，再标注</text>
+          <rect x="0" y="30" width="112" height="40" rx="8" fill="#fff" stroke="#e2e2e7"/>
+          <text x="56" y="55" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="12.5" fill="#33333b">真实会话</text>
+          <line x1="118" y1="50" x2="140" y2="50" stroke="#8b8b95" marker-end="url(#c1)"/>
+          <rect x="146" y="30" width="124" height="40" rx="8" fill="#faf7f7" stroke="#e8c4bc"/>
+          <text x="208" y="55" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="12.5" fill="#c2412d">人工标注</text>
+          <line x1="276" y1="50" x2="298" y2="50" stroke="#8b8b95" marker-end="url(#c1)"/>
+          <rect x="304" y="30" width="150" height="40" rx="8" fill="#fff" stroke="#e2e2e7"/>
+          <text x="379" y="55" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="12.5" fill="#33333b">浅层问题</text>
+          <text x="474" y="44" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#c2412d">单条标注的成本决定了难度配比</text>
+          <text x="474" y="62" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#8b8b95">深层问题沦为手工做出来的一条尾巴</text>
+
+          <line x1="0" y1="100" x2="820" y2="100" stroke="#ececef"/>
+
+          <text x="0" y="132" font-family="Inter, system-ui, sans-serif" font-size="12" font-weight="600" fill="#4b41d8" letter-spacing="1.2">生成，标注就已经在那里了</text>
+          <rect x="0" y="148" width="112" height="40" rx="8" fill="#fff" stroke="#4b41d8"/>
+          <text x="56" y="173" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="12.5" fill="#33333b">一个程序</text>
+          <line x1="118" y1="168" x2="140" y2="168" stroke="#8b8b95" marker-end="url(#c1)"/>
+          <rect x="146" y="148" width="150" height="40" rx="8" fill="#eeecfb" stroke="#4b41d8"/>
+          <text x="221" y="167" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="12.5" fill="#4b41d8">持久的应用状态</text>
+          <text x="221" y="182" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="11" fill="#4b41d8">真值归它所有</text>
+          <line x1="302" y1="168" x2="324" y2="168" stroke="#8b8b95" marker-end="url(#c1)"/>
+          <rect x="330" y="148" width="118" height="40" rx="8" fill="#fff" stroke="#e2e2e7"/>
+          <text x="389" y="173" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="12.5" fill="#33333b">视频帧</text>
+          <line x1="389" y1="194" x2="389" y2="212" stroke="#8b8b95" marker-end="url(#c1)"/>
+          <rect x="300" y="216" width="178" height="30" rx="7" fill="#fff" stroke="#e2e2e7"/>
+          <text x="389" y="236" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="12" fill="#33333b">问题，推导而来</text>
+          <text x="500" y="164" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#4b41d8">每一个光标目标、每一次字段编辑、</text>
+          <text x="500" y="182" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#4b41d8">每一条记录的最终归属——精确，且免费</text>
+          <text x="500" y="204" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#8b8b95">于是「有多少条从未被处理？」</text>
+          <text x="500" y="222" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#8b8b95">是一道算术题，而不是一项标注任务</text>
+        </svg>
+        <figcaption>标注并不是变便宜了。它们是「一开始就把整段会话写成一个程序」这件事的副产品。</figcaption>
+      </figure>
+
+      <p>我最后得到的语料是一百段不间断的十分钟会话——大约十六个半小时、约 39,000 个独立动作、140 万帧——横跨十二个不同的应用领域。每段录制大约十九个问题，合计约 1,900 个。其中没有一个是人标的，而每一个答案都是由构造得到的精确值，而不是靠标注者之间达成一致得到的。</p>
+
+      <h2 id="construct">由构造决定的难度</h2>
+
+      <p>我觉得比规模更有意思的是这一点：因为生成器知道发生了什么，它也就知道一个问题需要<em>哪一类推理</em>，并且能诚实地把这个标签打上去，而不是依赖标注者的印象。</p>
+
+      <p>于是题型配比成了一个设计决定，而不是一个结果。感知题和计数题占大头，因为它们是地板，你希望模型在这些题上翻车时能被一眼看见。此外还有一条刻意搭起来的、由更难题型组成的脊梁：把状态一路跟到会话结束；根据几分钟前作出的一个决定，判定某条记录的状态；解释某个确认对话框为什么会弹出、以及它被接受之后什么变了；还原两个相邻动作的先后顺序；描述操作者所遵循的重复模式；以及对这段会话自己的账目做算术。</p>
+
+      <figure class="plain">
+        <svg viewBox="0 0 820 236" role="img" aria-label="按推理类型划分的题目配比：感知与计数占主导，其次是状态跟踪与长程状态，再往下是数量相当的若干小类：因果、时序先后、抽象概括、对状态做算术，以及总结归纳。">
+          <text x="0" y="14" font-family="Inter, system-ui, sans-serif" font-size="12" fill="#8b8b95">按题目所需的推理类型划分——在会话生成时就已指定，而不是事后再贴</text>
+          <g font-family="Inter, system-ui, sans-serif" font-size="12.5">
+            <text x="0" y="46" fill="#33333b">感知</text>
+            <rect x="170" y="34" width="260" height="15" rx="3" fill="#a8a8b4"/>
+            <text x="0" y="72" fill="#33333b">计数</text>
+            <rect x="170" y="60" width="260" height="15" rx="3" fill="#a8a8b4"/>
+            <text x="0" y="98" fill="#33333b">状态跟踪</text>
+            <rect x="170" y="86" width="104" height="15" rx="3" fill="#4b41d8" opacity="0.55"/>
+            <text x="0" y="124" fill="#33333b">长程状态</text>
+            <rect x="170" y="112" width="104" height="15" rx="3" fill="#4b41d8" opacity="0.55"/>
+            <text x="0" y="150" fill="#33333b">因果</text>
+            <rect x="170" y="138" width="52" height="15" rx="3" fill="#4b41d8"/>
+            <text x="0" y="176" fill="#33333b">时序先后</text>
+            <rect x="170" y="164" width="52" height="15" rx="3" fill="#4b41d8"/>
+            <text x="440" y="150" fill="#33333b">抽象概括</text>
+            <rect x="580" y="138" width="52" height="15" rx="3" fill="#4b41d8"/>
+            <text x="440" y="176" fill="#33333b">对状态做算术</text>
+            <rect x="580" y="164" width="52" height="15" rx="3" fill="#4b41d8"/>
+            <text x="440" y="202" fill="#33333b">总结归纳</text>
+            <rect x="580" y="190" width="52" height="15" rx="3" fill="#4b41d8"/>
+          </g>
+          <line x1="0" y1="216" x2="820" y2="216" stroke="#ececef"/>
+          <text x="0" y="234" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#8b8b95">宽的那几条是地板。窄的那几条才是重点。</text>
+        </svg>
+        <figcaption>当标注变成免费的，难度分布就不再是标注预算的一张写照了。</figcaption>
+      </figure>
+
+      <p>每个问题还带着其答案所在窗口的时间戳，所以一个错误答案可以拿去对照那几秒确切含有证据的画面。这是件小事，却改变了调试的手感：一次失败不再是「模型答错了」，而变成「模型拿到了这九秒，仍然说了不」。</p>
+
+      <h2 id="unbroken">为什么「不间断」比「长」更重要</h2>
+
+      <p>生成十段一分钟的片段、把拼接结果叫作一段十分钟的会话，本来要容易得多。我认为那样做会悄无声息地毁掉我想测的那个东西。</p>
+
+      <p>值得问的问题，是那些答案取决于「早先作出、随后被兑现的承诺」的问题——一条记录在 01:33 被打开，而你必须在 09:30 报出它的状态。如果录制是拼出来的，这层依赖在像素里根本不存在，它只存在于我自己写下的元数据里。模型可以靠独立地读每一段就拿到高分，而我对长时程推理什么也学不到。</p>
+
+      <p>一份连续的状态还会顺带产生那些让一段会话显得真实的结构：队列随着工作推进而变空；筛选条件在被改动之前一直留着；相隔六分钟才敲进去的两个字段里，出现同一个操作员的名字。这些都不是写出来的，而是当你允许一个程序一直跑下去时自然发生的事。</p>
+
+      <h2 id="limits">显而易见的反对意见</h2>
+
+      <p>它是合成的，而合成数据测的是你生成出来的那个东西，不是世界。</p>
+
+      <p>这个反对意见是对的，我也没有完整的回答，只有一个界定范围的论证。我在这里测的是模型能不能跟踪状态、能不能在长时程上做推理——这是一种关于证据<em>结构</em>的能力，与照片级真实感无关。一个在干净的生成界面里都数不清有多少次通过的模型，到了嘈杂的真实界面上不会做得更好。就算成功不能迁移，失败应该是可以迁移的——这让它成为一个有用的下界，和一个糟糕的上界。</p>
+
+      <p>真正的局限更窄，我宁愿把它点出来：视觉分布是我自己的。干净的扁平界面、统一的字体排印、一个按我的生成器的方式移动的光标。模型完全可能以与推理毫无关系的方式过拟合到这些东西上，而我的设置里没有任何一处能抓住它。这份语料诚实的用法，是把它当成一件<em>诊断工具</em>——用来查出哪些推理类型会崩、崩在哪里——而不是当成一张排行榜；从它得到的任何绝对数字，我都会抱着怀疑去看。</p>
+
+      <p>我愿意毫不含糊地捍卫的部分，是那条原则。如果你在搭一个评测，而你发现自己正在为标注编预算，那就值得问一句：能不能改为把真值往上游挪，挪进某个真正持有它的东西里。需要花钱买的标注，会把你的基准塑造成「什么便宜看得见就测什么」。</p>
+
+      <div class="post-foot">
+        <a href="hold-the-model-fixed.html">← 相关：把模型固定住</a>
+        <a href="../index.zh.html#writing">全部文章 →</a>
+      </div>
+    </article>
+
+    <script>
+      const tb = document.getElementById("topbar");
+      addEventListener("scroll", () => tb.classList.toggle("scrolled", scrollY > 8), { passive: true });
+      const links = [...document.querySelectorAll(".toc a")];
+      const ids = links.map((a) => a.getAttribute("href").slice(1));
+      const spy = new IntersectionObserver((es) => {
+        es.forEach((e) => { if (e.isIntersecting) {
+          links.forEach((l) => l.classList.remove("active"));
+          const a = links.find((l) => l.getAttribute("href") === "#" + e.target.id);
+          if (a) a.classList.add("active");
+        }});
+      }, { rootMargin: "-70px 0px -70% 0px" });
+      ids.forEach((id) => { const el = document.getElementById(id); if (el) spy.observe(el); });
+    </script>
+  </body>
+</html>

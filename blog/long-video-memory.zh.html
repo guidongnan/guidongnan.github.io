@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <title>长视频的瓶颈是记忆，不是上下文 · Dongnan Gui</title>
+    <meta name="description" content="为什么把上下文窗口拉长是长视频生成里用错了的杠杆，以及一份可学习的压缩记忆能换来什么。" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;450;500;600&family=JetBrains+Mono:wght@400;500&family=Noto+Serif+SC:wght@500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="blog.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" />
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"
+      onload="renderMathInElement(document.body,{delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}],throwOnError:false})"></script>
+  </head>
+  <body>
+    <header class="topbar" id="topbar">
+      <a class="home" href="../index.zh.html">Dongnan Gui</a>
+      <a href="../index.zh.html#writing">← 全部文章</a>
+      <a href="long-video-memory.html">English</a>
+    </header>
+
+    <nav class="toc" id="toc">
+      <div class="toc-h">目录</div>
+      <a href="#framing">提法本身的问题</a>
+      <a href="#cache">模型到底存了什么</a>
+      <a href="#redundant">为什么大半都是浪费</a>
+      <a href="#three">约束历史的三条路</a>
+      <a href="#memory">一份可学习的记忆</a>
+      <a href="#forget">学会遗忘什么</a>
+      <a href="#where">这条路通向哪里</a>
+    </nav>
+
+    <article>
+      <div class="post-head">
+        <div class="kicker">视频生成札记</div>
+        <h1>长视频的瓶颈是记忆，不是上下文</h1>
+        <div class="meta">
+          <span>2026 年 8 月</span><span class="dot"></span>
+          <span>约 11 分钟</span><span class="dot"></span>
+          <span>自回归视频 · 长上下文 · 记忆</span>
+        </div>
+      </div>
+
+      <p class="lead">每隔几个月就有人把上下文窗口（context window）再拉长一截，然后管它叫长视频生成。这套提法我已经不信了。模型能往回看的距离其实早就够了；麻烦在于，回头看到的几乎全是重复，而我们还在为存下它、再读一遍付钱。</p>
+
+      <p>这篇札记要说的是：要生成又长又连贯的视频，<em>记忆</em>——一份小的、学出来的、持久的状态——是比<em>上下文</em>更好的着力点；以及其中真正困难的那一环究竟是什么。</p>
+
+      <h2 id="framing">提法本身的问题</h2>
+      <p>自回归视频模型用最直白的方式分解一段片段，一帧接着一帧：</p>
+      $$ p_\theta(x_{1:T}) = \prod_{t=1}^{T} p_\theta\!\left(x_t \mid x_{&lt;t}\right). $$
+      <p>全部戏份都在条件项 $x_{&lt;t}$ 上：模型在画下一帧时，如何把已经生成的一切归纳起来。在 transformer 里，「归纳」就是对历史 token 做自注意力，而历史被以<b>键值缓存</b>（key–value cache）的形式留在原地。所以论文里占主流的那种提法——<em>把上下文做得更长</em>——其实是在对这份缓存下判断：多留一些，注意力也多覆盖一些。</p>
+      <p>我觉得这个判断悄悄混淆了两件事：模型能往回<em>够</em>到多远，和它需要<em>记住</em>多少。这两个量并不是同一个东西，而视频把它们之间的差距拉得极大。</p>
+
+      <h2 id="cache">自回归视频模型究竟存下了什么</h2>
+      <p>拿一个隐空间（latent space）transformer 来说。每帧被编码成 $P$ 个 token（一张 $16\times16$ 的隐空间网格就已经是 $P=256$），模型有 $L$ 层，隐藏维度为 $d$。生成 $T$ 帧之后，KV 缓存里装着</p>
+      $$ \text{cache} \;=\; 2 \cdot L \cdot T \cdot P \cdot d \quad\text{scalars,} $$
+      <p>它随 $T$ <b>线性增长</b>，而且那个系数（$2LPd$）之所以大，恰恰是因为视频的 $P$ 很大。更糟的是，如果你要在整份缓存上做注意力，每一步的注意力开销是</p>
+      $$ \mathcal{O}\!\left((T P)^2 \, d\right), $$
+      <p>对当前长度 $TP$ 呈二次增长。按任何合理的 token 率算，一分钟的视频都会把你远远推到全注意力还负担得起的预算之外——显存和时间都是。这就是所有人都会撞上的那堵墙，而「上下文更长」是径直朝它走过去。</p>
+
+      <h2 id="redundant">为什么缓存里大半是浪费</h2>
+      <p>线性增长这套说法漏掉了一个观察：你走过一条走廊时，走廊本身并不会变。墙面的纹理、窗户透进来的光、左手边有一扇门——这些各自只值得记<em>一次</em>。碰巧拍到它们的那一百帧，不值得记一百遍，可一个朴素的缓存干的正是这件事。</p>
+      <blockquote><p>缓存随时间增长；<em>信息</em>随变化增长。而视频绝大部分是不变。</p></blockquote>
+      <p>所以冗余不是一个可以四舍五入掉的误差，它是主导项。相邻两帧之间，持续存在的部分——几何、身份、场景布局——远远压过在动的那部分。如果你能把「持续存在的东西」只存一次，让像素层面的翻搅自行冲刷掉，那么真正需要往后带的东西就会很小，尺寸也大致恒定，而不是随 $T$ 线性增长。</p>
+
+      <h2 id="three">约束历史的三条路</h2>
+      <p>要让条件项保持可算，大体上有三种做法，而每一种的代价都值得老实交代。</p>
+      <ul>
+        <li><b>滑动窗口。</b>只保留最近 $W$ 帧，其余丢掉。有界又简单，大多数流式模型就是这么做的。但它在构造上就注定会遗忘：走回两百帧之前见过的房间，模型完全不知道自己来过，于是重新装修一遍。长程一致性（long-range consistency）恰恰是固定窗口扔掉的那部分。</li>
+        <li><b>全注意力加各种技巧。</b>什么都留着，但把注意力做便宜——稀疏化、线性注意力、状态空间模型（state-space model）。这能把墙往后推；在 SSM 这一路里，缓存还被换成了一个固定大小的循环状态。它确实有用，但一个通用的长序列技巧并不知道视频的冗余是<em>有结构的</em>（静态背景 vs. 运动前景），它压缩得一视同仁。</li>
+        <li><b>学习式压缩。</b>把不断变长的历史映射进一份固定大小的记忆，再对它做注意力。这是 Transformer-XL 与 Compressive Transformer 这一脉 <a href="#r1">[1]</a><a href="#r2">[2]</a>被搬进了视频。它赌的是模型能学会该留下<em>什么</em>，于是记忆既保持很小，又不至于变瞎。</li>
+      </ul>
+      <p>我在意的是第三种，因为只有它的失败模式是「压错了东西」，而不是「结构上根本记不住」。</p>
+
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>做法</th><th>每步开销</th><th>状态大小</th><th>长程能力</th></tr></thead>
+        <tbody>
+          <tr><td>全注意力</td><td>$\mathcal{O}(TP\,d)$，随 $T$ 增长</td><td>$\mathcal{O}(TP)$，持续增长</td><td>精确，但负担不起</td></tr>
+          <tr><td>滑动窗口（$W$）</td><td>$\mathcal{O}(WP\,d)$</td><td>$\mathcal{O}(WP)$</td><td>超出 $W$ 帧即丢失</td></tr>
+          <tr><td>状态空间 / SSM</td><td>对 $T$ 而言 $\mathcal{O}(1)$</td><td>固定，$\mathcal{O}(d_{\text{state}})$</td><td>有压缩，但一视同仁</td></tr>
+          <tr><td>压缩记忆</td><td>$\mathcal{O}\big((m+WP)\,d\big)$</td><td>固定，$\mathcal{O}(m)$</td><td>学出来的，有选择性</td></tr>
+        </tbody>
+      </table></div>
+      <p>最后两行都能给你一个不随片段长度增长的状态。区别在最后一列。状态空间模型用一条固定的递推来压缩历史，对每个 token 一视同仁；而可学习的记忆被允许把槽位花在真正要紧的地方。对视频来说，值得留下的内容只占整条流里很小、且变化很慢的一部分，「有选择性」正是全部意义所在。</p>
+
+      <h2 id="memory">一份可学习的压缩记忆</h2>
+      <p>具体一点：带一个固定大小的记忆库（memory bank）$M \in \mathbb{R}^{m \times d}$，其中 $m \ll TP$。模型在画第 $t$ 帧时，并不对整段历史做注意力，而是对这份记忆加上一小段局部窗口做注意力：</p>
+      $$ h_t = \text{Attn}\!\left(Q_t,\; [\,M_{t-1};\,K^{\text{loc}}_t\,],\; [\,M_{t-1};\,V^{\text{loc}}_t\,]\right). $$
+      <p>这一帧生成之后，记忆再通过一个学出来的映射，由新帧的表示 $H_t$ 来<b>更新</b>：</p>
+      $$ M_t = g_\phi\!\left(M_{t-1},\, H_t\right). $$
+      <p>所有有意思的东西都住在 $g_\phi$ 里。它是一个读写控制器：决定覆盖哪些槽位、放过哪些槽位，以及怎样把一次新的观测折叠进一份已有的摘要。你可以把它实现成从记忆槽位到新 token 的交叉注意力（槽位自己「拉取」它在意的东西），再由一个学出来的门控决定每个槽位挪动多少。局部窗口负责让高频运动保持清晰；记忆负责让缓慢变化的场景状态跨越任意长的间隔活下来。</p>
+
+      <h3>写入是门控，不是追加</h3>
+      <p>最朴素的做法是把每一新帧的摘要追加进记忆——可那样记忆又开始变长，我们就回到了起点。更新必须是一次有界的覆写。把它写成逐槽位的门控：每个槽位 $i$ 自己决定朝刚看到的东西挪多远，</p>
+      $$ M_t^{(i)} = \big(1-\alpha_t^{(i)}\big)\,M_{t-1}^{(i)} \;+\; \alpha_t^{(i)}\,\tilde{H}_t^{(i)}, \qquad \alpha_t^{(i)} = \sigma\!\big(w^\top[\,M_{t-1}^{(i)};\,c_t^{(i)}\,]\big), $$
+      <p>其中 $c_t^{(i)} = \text{Attn}(M_{t-1}^{(i)}, H_t, H_t)$ 是槽位 $i$ 从新帧里拉到的内容，$\tilde{H}_t^{(i)}$ 是候选内容，$\alpha_t^{(i)} \in [0,1]$ 是学出来的写入门控。一个持有稳定几何的槽位会把 $\alpha$ 压在接近零处，几乎不动；一个正盯着刚刚发生变化的东西的槽位则会打开。没有任何东西被追加，所以不管你生成多久，状态始终恰好是 $m$ 个槽位那么宽。门控就是「该留下什么」从一条手写规则变成一个可微决策的地方。</p>
+
+      <figure>
+        <svg viewBox="0 0 720 250" xmlns="http://www.w3.org/2000/svg" font-family="Inter, sans-serif" font-size="13">
+          <defs>
+            <marker id="ah" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#8b8b95"/></marker>
+          </defs>
+          <rect x="24" y="150" width="86" height="52" rx="9" fill="#f6f6f8" stroke="#e2e2e7"/>
+          <text x="67" y="173" text-anchor="middle" fill="#33333b">帧</text>
+          <text x="67" y="190" text-anchor="middle" fill="#8b8b95" font-size="12">x&#8340;&#8331;&#8321;</text>
+          <rect x="150" y="150" width="96" height="52" rx="9" fill="#f6f6f8" stroke="#e2e2e7"/>
+          <text x="198" y="180" text-anchor="middle" fill="#33333b">编码器</text>
+          <rect x="300" y="44" width="120" height="60" rx="10" fill="#ffffff" stroke="#4b41d8"/>
+          <text x="360" y="70" text-anchor="middle" fill="#3a31b8" font-weight="600">记忆 M</text>
+          <text x="360" y="88" text-anchor="middle" fill="#8b8b95" font-size="12">m &#215; d 个槽位</text>
+          <rect x="470" y="150" width="110" height="52" rx="9" fill="#f6f6f8" stroke="#e2e2e7"/>
+          <text x="525" y="173" text-anchor="middle" fill="#33333b">解码</text>
+          <text x="525" y="190" text-anchor="middle" fill="#8b8b95" font-size="12">下一帧 x&#8348;</text>
+          <rect x="616" y="150" width="80" height="52" rx="9" fill="#f6f6f8" stroke="#e2e2e7"/>
+          <text x="656" y="180" text-anchor="middle" fill="#33333b">x&#8348;</text>
+          <line x1="110" y1="176" x2="148" y2="176" stroke="#8b8b95" marker-end="url(#ah)"/>
+          <line x1="246" y1="176" x2="296" y2="176" stroke="#8b8b95" marker-end="url(#ah)"/>
+          <path d="M250,150 C250,110 290,96 300,90" fill="none" stroke="#4b41d8" stroke-dasharray="4 3" marker-end="url(#ah)"/>
+          <text x="250" y="120" text-anchor="end" fill="#3a31b8" font-size="12">写入</text>
+          <path d="M420,90 C470,96 500,120 512,148" fill="none" stroke="#4b41d8" stroke-dasharray="4 3" marker-end="url(#ah)"/>
+          <text x="486" y="116" fill="#3a31b8" font-size="12">读取</text>
+          <line x1="580" y1="176" x2="614" y2="176" stroke="#8b8b95" marker-end="url(#ah)"/>
+          <path d="M656,150 C656,120 360,120 360,106" fill="none" stroke="#e2e2e7" marker-end="url(#ah)"/>
+        </svg>
+        <figcaption>读写回路。下一帧在一份固定大小的记忆（外加一小段局部窗口）上做注意力；生成出的帧再被折叠回记忆。每步开销不再随片段长度增长。</figcaption>
+      </figure>
+
+      <p>回报不只是速度。固定大小的循环状态改变了渐近复杂度——每步开销不再取决于你已经生成了多久——但它同时也改变了模型被<em>鼓励</em>去表示的东西。一个必须被永远反复使用的 $m$ 槽位记忆库就是一个瓶颈，而抽象正是从瓶颈里长出来的。模型没办法把每一帧都留下，于是它不得不去判断，一个场景究竟<em>是</em>什么。</p>
+
+      <h2 id="forget">难的部分：学会遗忘什么</h2>
+      <p>我一周里的大半时间都花在这里，那张整洁的示意图也正是在这里开始不整洁的。决定<em>写</em>什么相对容易；决定<em>驱逐</em>什么就不是了，而且没有人会为此给模型标签。你在第 $t$ 帧覆盖掉的那个槽位，也许保存着某个地标的唯一痕迹，而模型到第 $t+400$ 帧还要再用它。这个决定的监督信号，晚到了四百步。</p>
+      <p>所以真正的问题是穿过记忆更新的信用分配（credit assignment）。有几样东西确实管用，大致按我信任它们的程度排下来：</p>
+      <ul>
+        <li><b>沿时间训练的递推。</b>如果 $M_t = g_\phi(M_{t-1}, H_t)$，而损失落在第 $t+k$ 帧上，梯度就会沿整条更新链回传，类似 Transformer-XL 的分段递推 <a href="#r1">[1]</a>。代价高，还要跟消失的信号搏斗，但这是老实的版本。</li>
+        <li><b>作用在记忆上的辅助重建损失。</b>Compressive Transformer <a href="#r2">[2]</a> 额外加了一项损失，逼着压缩后的记忆仍然能<em>重建</em>出注意力本来要拿它去做的事。这让驱逐决策拿到一个就近的、即时的梯度，而不是一个遥远的。</li>
+        <li><b>一致性目标。</b>视频白送你一个图像给不了的标签：回到同一个地方，它就该还是它自己。当镜头重新经过某个区域时惩罚漂移，正好训练记忆去持有我们一开始就想让它持有的那份持久场景状态。</li>
+      </ul>
+      <p>实际做起来，这些会折进同一个目标——你真正想要的生成损失，一项给驱逐提供就近梯度的记忆重建项，以及一项在镜头绕回来时惩罚漂移的一致性项：</p>
+      $$ \mathcal{L} = \mathcal{L}_{\text{gen}} \;+\; \lambda_{\text{mem}}\,\mathcal{L}_{\text{recon}}(M) \;+\; \lambda_{\text{cyc}}\,\mathcal{L}_{\text{consistency}}. $$
+      <p>那两个辅助项是脚手架。它们存在的意义是让一次遗忘决策的遥远后果被更早地感受到，因为单靠生成损失，信用分配来得太晚，晚到没有用处。</p>
+      <p>这些都没有彻底解决问题。遗忘是一个套着表示学习外衣的控制问题，而奖励既稀疏又延迟。但它就是症结所在——把驱逐做对，系统的其余部分几乎可以说是无聊的。</p>
+
+      <div class="callout"><b>顺带一句。</b>这也是我不信任那些只给短片段打分的基准的原因。一个没有记忆但解码器不错的模型，头两秒看上去挺好。差距只有在镜头回到它去过的地方时才拉得开，而大多数评测指标（metric）根本不会让它回去。</div>
+
+      <h2 id="where">这条路通向哪里</h2>
+      <p>如果你认真对待记忆这个视角，「长视频」就不再是一场上下文长度的军备竞赛，而变成一个关于状态的问题：为了让一个世界保持自洽，模型必须携带的最小的那样东西是什么，它又如何学会携带它？这个问题与世界模型（world model）<a href="#r3">[3]</a>、与状态空间序列模型 <a href="#r4">[4]</a>、也与我们自己导航的方式互相呼应——你不会每次走进厨房都把厨房重新推导一遍；你保有一张压缩过的地图，等到有什么不对劲时再去修正它。</p>
+      <p>我不认为这个领域缺让注意力变便宜的办法。我认为它缺的是知道什么值得记住的模型。那才是我觉得值得做的部分。</p>
+
+      <hr />
+      <div class="refs">
+        <h3>参考文献</h3>
+        <ol>
+          <li id="r1">Dai, Z., Yang, Z., Yang, Y., Carbonell, J., Le, Q. V., &amp; Salakhutdinov, R. (2019). <a href="https://scholar.google.com/scholar?q=Transformer-XL+Attentive+Language+Models+Beyond+a+Fixed-Length+Context" target="_blank" rel="noopener">Transformer-XL: Attentive Language Models Beyond a Fixed-Length Context</a>. ACL.</li>
+          <li id="r2">Rae, J. W., Potapenko, A., Jayakumar, S. M., &amp; Lillicrap, T. P. (2020). <a href="https://scholar.google.com/scholar?q=Compressive+Transformers+for+Long-Range+Sequence+Modelling" target="_blank" rel="noopener">Compressive Transformers for Long-Range Sequence Modelling</a>. ICLR.</li>
+          <li id="r3">Ha, D., &amp; Schmidhuber, J. (2018). <a href="https://scholar.google.com/scholar?q=Recurrent+World+Models+Facilitate+Policy+Evolution" target="_blank" rel="noopener">World Models</a>. NeurIPS.</li>
+          <li id="r4">Gu, A., &amp; Dao, T. (2023). <a href="https://scholar.google.com/scholar?q=Mamba+Linear-Time+Sequence+Modeling+with+Selective+State+Spaces" target="_blank" rel="noopener">Mamba: Linear-Time Sequence Modeling with Selective State Spaces</a>.</li>
+        </ol>
+      </div>
+
+      <div class="post-foot">
+        <a href="../index.zh.html#writing">← 全部文章</a>
+        <a href="single-image-world.html">下一篇：一张图已经是一个世界 →</a>
+      </div>
+    </article>
+
+    <script>
+      const tb = document.getElementById("topbar");
+      addEventListener("scroll", () => tb.classList.toggle("scrolled", scrollY > 8), { passive: true });
+      const links = [...document.querySelectorAll(".toc a")];
+      const ids = links.map((a) => a.getAttribute("href").slice(1));
+      const spy = new IntersectionObserver((es) => {
+        es.forEach((e) => { if (e.isIntersecting) {
+          links.forEach((l) => l.classList.remove("active"));
+          const a = links.find((l) => l.getAttribute("href") === "#" + e.target.id);
+          if (a) a.classList.add("active");
+        }});
+      }, { rootMargin: "-70px 0px -70% 0px" });
+      ids.forEach((id) => { const el = document.getElementById(id); if (el) spy.observe(el); });
+    </script>
+  </body>
+</html>

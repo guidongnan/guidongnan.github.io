@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <title>一张图像已经是一个世界 · Dongnan Gui</title>
+    <meta name="description" content="为什么单图世界生成真正的目标是一致性而不是保真度——以及这个目标对模型提出了什么要求。" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;450;500;600&family=JetBrains+Mono:wght@400;500&family=Noto+Serif+SC:wght@500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="blog.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" />
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"
+      onload="renderMathInElement(document.body,{delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}],throwOnError:false})"></script>
+  </head>
+  <body>
+    <header class="topbar" id="topbar">
+      <a class="home" href="../index.zh.html">Dongnan Gui</a>
+      <a href="../index.zh.html#writing">← 全部文章</a>
+      <a href="single-image-world.html">English</a>
+    </header>
+
+    <nav class="toc" id="toc">
+      <div class="toc-h">目录</div>
+      <a href="#guess">镜头背后的那个猜测</a>
+      <a href="#fidelity">保真度是容易的那一维</a>
+      <a href="#consistency">一致性要求什么</a>
+      <a href="#measure">怎么度量它</a>
+      <a href="#mech">一致性从哪里来</a>
+      <a href="#prior">为什么一张图就够了</a>
+    </nav>
+
+    <article>
+      <div class="post-head">
+        <div class="kicker">视频生成札记</div>
+        <h1>一张图像已经是一个世界</h1>
+        <div class="meta">
+          <span>2026 年 8 月</span><span class="dot"></span>
+          <span>约 8 分钟</span><span class="dot"></span>
+          <span>世界模型 · 图生视频 · 一致性</span>
+        </div>
+      </div>
+
+      <p class="lead">递给别人一张街景照片，问他镜头背后是什么。他会编一个出来，而这个编造并不随意——它服从同一座城市、同一种天气、一天中的同一个钟点。这个小小的猜测动作就是在造世界，也是我最在意的那种能力。</p>
+
+      <h2 id="guess">镜头背后的那个猜测</h2>
+      <p>图像看上去只是一片扁平的像素阵列，但没有人是这么感知它的。你会把一张照片读成某个三维、且在时间上延展的世界的一个切片，连画外都是给定的：房间剩下的部分、越出画框继续延伸的街道、你往左走两步之后眼前会是什么样子。单图世界模型（single-image world model）赌的就是网络也能做同样的推断——从一个视角生成一整个可漫游的场景，你可以在里面转身、穿行、再走回来。</p>
+      <p>我找到的最干净的表述是：不要生成视频，而要生成一个<em>世界</em>，再把视频当成读取它的一种方式。形式化一点，设想一个（隐式的）世界状态 $W$，以及一个把相机位姿 $c$ 变成图像的渲染器：</p>
+      $$ \hat{x}_c = R(W, c). $$
+      <p>那么，生成一张全景图或一段飞越镜头，就是从<em>同一个</em> $W$ 上做一串读取 $R(W, c_1), R(W, c_2), \dots$。一旦这样写下来，真正有意思的那个要求就自己冒出来了。</p>
+
+      <h2 id="fidelity">保真度是容易的那一维</h2>
+      <p>大多数图生视频（image-to-video）工作是按保真度（fidelity）评判的：画面清晰、运动合理、没有闪烁。这一维当然重要，但它也正是一个足够强的解码器可以悄悄替你扛下来的那一维。扩散模型极其擅长把任何单独一帧做得像真的。给模型一个好的逐帧先验，漂亮的输出几乎是白送的。</p>
+      <p>麻烦在于，「每一帧都像真的」完全没有说这些帧描述的是不是<em>同一个</em>地方。你可以得到这样一段序列：每张图都很锐利，相邻两张之间也都很平滑，可它们底下的世界却在悄悄地各不相同——本来在左边的门，摇回来的时候跑到了右边；一幅画在你移开视线又看回去之后换了题材。</p>
+
+      <h2 id="consistency">一致性要求什么</h2>
+      <p>所以我真正关心的目标是<b>一致性</b>（consistency）：在不同位姿下对 $W$ 的读取，凡是重叠的地方就必须彼此吻合。转九十度再转回来，世界应该还是你离开时的那个世界。用渲染器的记号写：只要两个位姿看到了同一片表面，它们的输出在那里就必须匹配——</p>
+      $$ R(W, c_i) \;\approx\; R(W, c_j) \quad\text{on their shared content.} $$
+      <p>这是一个很强的约束，而且强得有用：你没法靠一个更好的解码器把它满足掉。它逼着模型对某个潜在场景做出<em>承诺</em>，并在相机移动的过程中一直守着这个承诺。保真度是帧的属性；一致性是帧背后那个世界的属性——只有后者要求模型真的决定过世界是什么样。</p>
+      <blockquote><p>保真度可以用一个好解码器伪装出来。一致性伪装不了——它就是模型拒绝改口。</p></blockquote>
+      <p>缺一致性时的失效模式出奇地具体，我现在一眼就能认出来：模型不是把画面糊掉，而是在<em>重新装修</em>。你不看的时候，房间就自己重新摆过一遍，像梦里的地方那样。这个破绽就是整个问题的缩影——一个系统在生成局部看着合理的帧，却没有任何全局上被承诺下来的状态。</p>
+
+      <h2 id="measure">怎么度量它</h2>
+      <p>既然一致性是目标，那它就必须是被度量的那个东西，逐帧质量分数干不了这活。有几个探针我比 FID 数字更信得过：</p>
+      <ul>
+        <li><b>闭环（loop closure）。</b>生成一整圈转身，回到起始位姿，再把回来的视角和原图对比。任何配得上「世界模型」这个名字的系统都应该近乎复现它；这里的漂移是「不存在稳定的 $W$」最干净的信号。</li>
+        <li><b>跨视角吻合度。</b>在两个生成视角重叠的地方，用几何把其中一个 warp 到另一个的坐标系里，量它们的不匹配。这打的是世界的分，不是好看程度的分。</li>
+        <li><b>时间上的重访。</b>和闭环是同一个测试，只是拉长了——离开一个区域，四处游荡，很久之后再回来。正是在这里，记忆（<a href="long-video-memory.html">上一篇</a>的主题）和世界一致性显出是同一个问题的两个侧面。</li>
+      </ul>
+
+      <h2 id="mech">一致性只能从哪里来</h2>
+      <p>一致性不会从逐帧损失里意外地长出来；必须由架构里的某个东西去强制它。有三样东西承担了大部分工作，而且它们彼此依靠。</p>
+      <ul>
+        <li><b>一个持久的表征。</b>生成必须经由一个跨视角共享的状态——一张全景图、一个潜网格、一个隐式场景——而不是每帧各画各的。如果每个视角都是重新采样出来的，那就根本没有东西可供它去<em>保持一致</em>。</li>
+        <li><b>把重投影当成损失，而不只是当成指标。</b>那套让你能<em>度量</em>跨视角吻合度的几何，同样可以拿来<em>监督</em>它。把一个生成视角 warp 到相邻视角的坐标系，在重叠处惩罚它们的分歧；模型于是学到：转动相机是在变换同一个世界，而不是在提示生成一个新世界。</li>
+        <li><b>带反馈的自回归延拓。</b>要越过单张全景图，你得把世界续下去：生成、承诺、再让下一步以刚刚承诺的内容为条件。这恰恰就是<a href="long-video-memory.html">上一篇</a>里的长程记忆问题——所以我认为空间上的一致性和时间上的一致性，是同一个要求换了两身衣服。</li>
+      </ul>
+      <p>目标函数写出来也是这个意思：一个生成项，加上一个在重叠视角上的重投影项，</p>
+      $$ \mathcal{L} = \mathcal{L}_{\text{gen}} + \lambda \sum_{i,j} \big\lVert \Pi_{i\to j}\,R(W,c_i) - R(W,c_j) \big\rVert_{\Omega_{ij}}, $$
+      <p>其中 $\Pi_{i\to j}$ 把视角 $i$ warp 到视角 $j$，而 $\Omega_{ij}$ 是它们的共同区域。第二项恰好在模型已经承诺了单一世界时为零；任何非零值都是模型自相矛盾被当场抓住。</p>
+
+      <h2 id="prior">为什么一张图就够了</h2>
+      <p>这听上去信息量太少了——就一个视角，却想要一整个世界。但模型并不是在重建场景，而是在<em>合理地补全</em>它，而一个好的自然场景生成先验本身就携带了答案中极大的一部分。街道有对面；房间有第四面墙；光总是从某个自洽的方向来。那张图钉住的是这个具体的世界；先验补上图里没显示的一切，就像你毫不费力地猜出了镜头背后是什么。</p>
+      <p>这才是我觉得真正令人兴奋的地方。当一个由单图生成的世界在你穿行其中时仍然自洽，那既不是渲染技巧，也不是死记硬背。里面有某个东西看了一帧，然后决定了世界是什么样——并且愿意为此负责到底。</p>
+
+      <hr />
+      <div class="refs">
+        <h3>参考文献</h3>
+        <ol>
+          <li id="r1">Ha, D., &amp; Schmidhuber, J. (2018). <a href="https://scholar.google.com/scholar?q=Recurrent+World+Models+Facilitate+Policy+Evolution" target="_blank" rel="noopener">World Models</a>. NeurIPS.</li>
+          <li id="r2">Bruce, J., et al. (2024). <a href="https://scholar.google.com/scholar?q=Genie+Generative+Interactive+Environments" target="_blank" rel="noopener">Genie: Generative Interactive Environments</a>. ICML.</li>
+          <li id="r3">Gui, D., Guo, X., Zhou, W., &amp; Lu, Y. (2025). <a href="https://openreview.net/forum?id=PA47sKU8CU" target="_blank" rel="noopener">Image as a World: Generating Interactive World from Single Image via Panoramic Video Generation</a>. NeurIPS.</li>
+        </ol>
+      </div>
+
+      <div class="post-foot">
+        <a href="long-video-memory.html">← 记忆，而不是上下文</a>
+        <a href="i2v-consent.html">下一篇：我们教会了照片动起来 →</a>
+      </div>
+    </article>
+
+    <script>
+      const tb = document.getElementById("topbar");
+      addEventListener("scroll", () => tb.classList.toggle("scrolled", scrollY > 8), { passive: true });
+      const links = [...document.querySelectorAll(".toc a")];
+      const spy = new IntersectionObserver((es) => {
+        es.forEach((e) => { if (e.isIntersecting) {
+          links.forEach((l) => l.classList.remove("active"));
+          const a = links.find((l) => l.getAttribute("href") === "#" + e.target.id);
+          if (a) a.classList.add("active");
+        }});
+      }, { rootMargin: "-70px 0px -70% 0px" });
+      links.map((a) => a.getAttribute("href").slice(1)).forEach((id) => { const el = document.getElementById(id); if (el) spy.observe(el); });
+    </script>
+  </body>
+</html>

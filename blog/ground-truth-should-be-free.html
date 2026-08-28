@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <title>Ground truth should be free · Dongnan Gui</title>
+    <meta name="description" content="If a simulator owns the state, every label is exact and costs nothing — which is the only reason deep-reasoning questions about a ten-minute recording are answerable rather than guessable." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;450;500;600&family=JetBrains+Mono:wght@400;500&family=Noto+Serif+SC:wght@500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="blog.css" />
+  </head>
+  <body>
+    <header class="topbar" id="topbar">
+      <a class="home" href="../index.html">Dongnan Gui</a>
+      <a href="../index.html#writing">← All writing</a>
+      <a href="ground-truth-should-be-free.zh.html">中文</a>
+    </header>
+
+    <nav class="toc" id="toc">
+      <div class="toc-h">Contents</div>
+      <a href="#annotate">What annotation cannot buy</a>
+      <a href="#own">Let the simulator own the state</a>
+      <a href="#construct">Difficulty by construction</a>
+      <a href="#unbroken">Why unbroken matters</a>
+      <a href="#limits">The obvious objection</a>
+    </nav>
+
+    <article>
+      <div class="post-head">
+        <div class="kicker">Field note</div>
+        <h1>Ground truth should be free</h1>
+        <div class="meta">
+          <span>August 2026</span><span class="dot"></span>
+          <span>~6 min</span><span class="dot"></span>
+          <span>evaluation · data · long horizon</span>
+        </div>
+      </div>
+
+      <p class="lead">I needed to evaluate whether a model can follow ten minutes of continuous activity and answer questions that require remembering what happened eight minutes ago. The usual path is to record real sessions and pay people to label them. I think that path is not merely expensive — it structurally cannot produce the questions I wanted to ask.</p>
+
+      <h2 id="annotate">What annotation cannot buy</h2>
+
+      <p>Suppose you have a ten-minute screen recording of someone working through a queue of records. Here are two questions about it:</p>
+
+      <ul>
+        <li>"At 05:09, which tab is active?"</li>
+        <li>"The queue starts with 57 records. Based on the work done in this recording, how many were never processed?"</li>
+      </ul>
+
+      <p>The first is a perception question. An annotator can answer it by looking at one frame. The second requires knowing every record that was opened, every verdict applied, every save, and doing arithmetic over the whole session. An annotator <em>can</em> answer it, in the sense that a very patient person with a scrubber could reconstruct it in twenty minutes and probably get it wrong once in five.</p>
+
+      <p>So the economics decide the benchmark. When labels cost human minutes, you get a corpus dominated by questions that cost seconds to label, and the deep questions appear as a small hand-made tail — which is exactly backwards from what you want to measure. The difficulty distribution of your benchmark ends up being a picture of your annotation budget rather than of the capability.</p>
+
+      <h2 id="own">Let the simulator own the state</h2>
+
+      <p>The move is to stop recording reality and start generating it, with one hard requirement: <b>a single program drives one persistent application state for the whole session.</b> Not clips stitched together, not scripted fragments — one unbroken run where the app has a real model of itself.</p>
+
+      <p>Do that and the labels fall out for nothing. Every cursor target is known because the program aimed it. Every field edit is known because the program made it. Every record's final bucket is known because the state machine put it there. There is no annotation step at all; there is a serialisation step.</p>
+
+      <figure class="plain">
+        <svg viewBox="0 0 820 250" role="img" aria-label="Top: record reality then pay annotators, giving costly, noisy, shallow labels. Bottom: a program drives one persistent application state, so the log is the ground truth and deep questions are derivable.">
+          <defs>
+            <marker id="c1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#8b8b95"/></marker>
+          </defs>
+          <text x="0" y="14" font-family="Inter, system-ui, sans-serif" font-size="12" font-weight="600" fill="#8b8b95" letter-spacing="1.2">RECORD, THEN LABEL</text>
+          <rect x="0" y="30" width="112" height="40" rx="8" fill="#fff" stroke="#e2e2e7"/>
+          <text x="56" y="55" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="12.5" fill="#33333b">real session</text>
+          <line x1="118" y1="50" x2="140" y2="50" stroke="#8b8b95" marker-end="url(#c1)"/>
+          <rect x="146" y="30" width="124" height="40" rx="8" fill="#faf7f7" stroke="#e8c4bc"/>
+          <text x="208" y="55" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="12.5" fill="#c2412d">humans label</text>
+          <line x1="276" y1="50" x2="298" y2="50" stroke="#8b8b95" marker-end="url(#c1)"/>
+          <rect x="304" y="30" width="150" height="40" rx="8" fill="#fff" stroke="#e2e2e7"/>
+          <text x="379" y="55" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="12.5" fill="#33333b">shallow questions</text>
+          <text x="474" y="44" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#c2412d">cost per label sets the difficulty mix</text>
+          <text x="474" y="62" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#8b8b95">deep questions become a hand-made tail</text>
+
+          <line x1="0" y1="100" x2="820" y2="100" stroke="#ececef"/>
+
+          <text x="0" y="132" font-family="Inter, system-ui, sans-serif" font-size="12" font-weight="600" fill="#4b41d8" letter-spacing="1.2">GENERATE, AND THE LABELS ARE ALREADY THERE</text>
+          <rect x="0" y="148" width="112" height="40" rx="8" fill="#fff" stroke="#4b41d8"/>
+          <text x="56" y="173" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="12.5" fill="#33333b">one program</text>
+          <line x1="118" y1="168" x2="140" y2="168" stroke="#8b8b95" marker-end="url(#c1)"/>
+          <rect x="146" y="148" width="150" height="40" rx="8" fill="#eeecfb" stroke="#4b41d8"/>
+          <text x="221" y="167" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="12.5" fill="#4b41d8">persistent app state</text>
+          <text x="221" y="182" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="11" fill="#4b41d8">it owns the truth</text>
+          <line x1="302" y1="168" x2="324" y2="168" stroke="#8b8b95" marker-end="url(#c1)"/>
+          <rect x="330" y="148" width="118" height="40" rx="8" fill="#fff" stroke="#e2e2e7"/>
+          <text x="389" y="173" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="12.5" fill="#33333b">frames</text>
+          <line x1="389" y1="194" x2="389" y2="212" stroke="#8b8b95" marker-end="url(#c1)"/>
+          <rect x="300" y="216" width="178" height="30" rx="7" fill="#fff" stroke="#e2e2e7"/>
+          <text x="389" y="236" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="12" fill="#33333b">questions, derived</text>
+          <text x="500" y="164" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#4b41d8">every cursor target, every field edit,</text>
+          <text x="500" y="182" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#4b41d8">every record’s final bucket — exact, free</text>
+          <text x="500" y="204" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#8b8b95">so “how many were never processed?”</text>
+          <text x="500" y="222" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#8b8b95">is arithmetic, not an annotation task</text>
+        </svg>
+        <figcaption>The labels are not cheaper. They are a by-product of having written the session down as a program in the first place.</figcaption>
+      </figure>
+
+      <p>The corpus I ended up with is a hundred unbroken ten-minute sessions — about sixteen and a half hours, some 39,000 individual actions, 1.4 million frames — across a dozen different application domains. Roughly nineteen questions per recording, so about 1,900 in total. Not one of them was labelled by a person, and every answer is exact by construction rather than by agreement.</p>
+
+      <h2 id="construct">Difficulty by construction</h2>
+
+      <p>The part I think is more interesting than the scale: because the generator knows what happened, it can also know <em>what kind of reasoning</em> a question requires, and assign that label honestly rather than by a rater's impression.</p>
+
+      <p>So the mix is a design decision instead of an outcome. Perception and counting questions are the bulk, because they are the floor and you want a model to be able to fail them visibly. Then there is a deliberate spine of harder types: tracking state to the end of the session, resolving a record's status from a decision made minutes earlier, explaining why a confirmation dialog appeared and what changed once it was accepted, recovering the order of two adjacent actions, describing the repeating pattern the operator follows, and doing arithmetic over the session's own bookkeeping.</p>
+
+      <figure class="plain">
+        <svg viewBox="0 0 820 236" role="img" aria-label="Question mix by reasoning type: perception and counting dominate, followed by state tracking and long-range state, then smaller equal groups for causal, temporal order, abstraction, arithmetic over state and summarisation.">
+          <text x="0" y="14" font-family="Inter, system-ui, sans-serif" font-size="12" fill="#8b8b95">questions by the reasoning they require — assigned when the session is generated, not afterwards</text>
+          <g font-family="Inter, system-ui, sans-serif" font-size="12.5">
+            <text x="0" y="46" fill="#33333b">perception</text>
+            <rect x="170" y="34" width="260" height="15" rx="3" fill="#a8a8b4"/>
+            <text x="0" y="72" fill="#33333b">counting</text>
+            <rect x="170" y="60" width="260" height="15" rx="3" fill="#a8a8b4"/>
+            <text x="0" y="98" fill="#33333b">state tracking</text>
+            <rect x="170" y="86" width="104" height="15" rx="3" fill="#4b41d8" opacity="0.55"/>
+            <text x="0" y="124" fill="#33333b">long-range state</text>
+            <rect x="170" y="112" width="104" height="15" rx="3" fill="#4b41d8" opacity="0.55"/>
+            <text x="0" y="150" fill="#33333b">causal</text>
+            <rect x="170" y="138" width="52" height="15" rx="3" fill="#4b41d8"/>
+            <text x="0" y="176" fill="#33333b">temporal order</text>
+            <rect x="170" y="164" width="52" height="15" rx="3" fill="#4b41d8"/>
+            <text x="440" y="150" fill="#33333b">abstraction</text>
+            <rect x="580" y="138" width="52" height="15" rx="3" fill="#4b41d8"/>
+            <text x="440" y="176" fill="#33333b">arithmetic over state</text>
+            <rect x="580" y="164" width="52" height="15" rx="3" fill="#4b41d8"/>
+            <text x="440" y="202" fill="#33333b">summarisation</text>
+            <rect x="580" y="190" width="52" height="15" rx="3" fill="#4b41d8"/>
+          </g>
+          <line x1="0" y1="216" x2="820" y2="216" stroke="#ececef"/>
+          <text x="0" y="234" font-family="Inter, system-ui, sans-serif" font-size="11.5" fill="#8b8b95">The wide bars are the floor. The narrow ones are the point.</text>
+        </svg>
+        <figcaption>When labels are free, the difficulty distribution stops being a picture of the annotation budget.</figcaption>
+      </figure>
+
+      <p>Every question also carries the timestamp of the window its answer comes from, so a wrong answer can be inspected against the exact seconds that contain the evidence. That is a small thing that changes how debugging feels: a failure stops being "the model got it wrong" and becomes "the model had these nine seconds and still said no."</p>
+
+      <h2 id="unbroken">Why unbroken matters more than long</h2>
+
+      <p>It would have been much easier to generate ten one-minute clips and call the concatenation a ten-minute session. I think that would have quietly destroyed the thing I was trying to measure.</p>
+
+      <p>The questions worth asking are the ones whose answer depends on a commitment made early and honoured later — a record opened at 01:33 whose status you must report at 09:30. If the recording is stitched, that dependency does not exist in the pixels; it exists only in the metadata I wrote. A model could score well by reading each segment independently, and I would learn nothing about long-horizon reasoning.</p>
+
+      <p>One continuous state also produces the incidental structure that makes a session feel real: the queue empties as work is done, filters persist until changed, the same operator name appears in fields typed six minutes apart. None of that is authored. It is what happens when one program is allowed to keep running.</p>
+
+      <h2 id="limits">The obvious objection</h2>
+
+      <p>It is synthetic, and synthetic data measures the thing you generated rather than the world.</p>
+
+      <p>That objection is correct and I do not have a full answer, only a scoping argument. What I am measuring here is whether a model can track state and reason over a long horizon — a capability that is about the <em>structure</em> of the evidence, not its photorealism. A model that cannot count approvals in a clean, generated interface is not going to do better on a noisy real one. The failures should transfer even if the successes do not, which makes this a useful lower bound and a bad upper bound.</p>
+
+      <p>The real limitation is narrower and I would rather name it: the visual distribution is mine. Clean flat interfaces, consistent typography, a cursor that moves the way my generator moves it. A model can overfit to that in ways that have nothing to do with reasoning, and nothing in my setup would catch it. The honest use of this corpus is as a <em>diagnostic</em> — to find out which reasoning types collapse and where — rather than as a leaderboard, and I would treat any absolute number from it with suspicion.</p>
+
+      <p>The part I would defend without hedging is the principle. If you are building an evaluation and you find yourself budgeting for annotation, it is worth asking whether you could instead move the truth upstream, into something that owns it. Labels you have to pay for shape your benchmark toward whatever is cheap to see.</p>
+
+      <div class="post-foot">
+        <a href="hold-the-model-fixed.html">← Related: Hold the model fixed</a>
+        <a href="../index.html#writing">All writing →</a>
+      </div>
+    </article>
+
+    <script>
+      const tb = document.getElementById("topbar");
+      addEventListener("scroll", () => tb.classList.toggle("scrolled", scrollY > 8), { passive: true });
+      const links = [...document.querySelectorAll(".toc a")];
+      const ids = links.map((a) => a.getAttribute("href").slice(1));
+      const spy = new IntersectionObserver((es) => {
+        es.forEach((e) => { if (e.isIntersecting) {
+          links.forEach((l) => l.classList.remove("active"));
+          const a = links.find((l) => l.getAttribute("href") === "#" + e.target.id);
+          if (a) a.classList.add("active");
+        }});
+      }, { rootMargin: "-70px 0px -70% 0px" });
+      ids.forEach((id) => { const el = document.getElementById(id); if (el) spy.observe(el); });
+    </script>
+  </body>
+</html>
